@@ -56,6 +56,7 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 | `box-shadow` (incluido `inset` y `spread`) | Drop shadow / Inner shadow |
 | `opacity`, `overflow` | Opacidad de capa, Clip content |
 | Texto: familia, peso, itálica, tamaño, `line-height`, `letter-spacing`, `text-transform`, subrayado y tachado, alineación | Capa de texto editable |
+| `background-clip: text` (texto con degradado o imagen) | Relleno de degradado/imagen en las capas de texto, continuo entre líneas |
 | `<img>`, `<canvas>`, `poster` de `<video>`, SVG en línea (incluidos `<use>` de sprites) | Relleno de imagen / vector |
 | `<input>`, `<textarea>`, `<select>` | Frame + texto del valor o placeholder |
 | Shadow DOM y `<slot>` | Se recorren como DOM normal |

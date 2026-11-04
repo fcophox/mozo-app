@@ -25,7 +25,16 @@ const sample = {
         border: { top: 1, right: 2, bottom: 1, left: 2, color: { r: 0, g: 0, b: 0, a: 1 } },
         radii: { topLeft: 8, topRight: 8, bottomRight: 0, bottomLeft: 0 },
         shadows: [{ inset: false, x: 0, y: 4, blur: 12, spread: 0, color: { r: 0, g: 0, b: 0, a: 0.1 } }],
-        children: [text({ x: 30, y: 30 }), text({ wrap: true, textAlign: 'LEFT', fontFamilies: ['Nope Font'], italic: true, lineHeight: null })],
+        children: [
+          text({ x: 30, y: 30 }),
+          text({ wrap: true, textAlign: 'LEFT', fontFamilies: ['Nope Font'], italic: true, lineHeight: null }),
+          // background-clip: text — degradado definido sobre una caja más ancha que el texto.
+          text({
+            name: 'grad', x: 120, y: 100, textAlign: 'LEFT', characters: 'Degradado',
+            fills: [{ type: 'LINEAR_GRADIENT', angle: 90, stops: [{ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } }, { position: 1, color: { r: 0, g: 0, b: 1, a: 1 } }] }],
+            fillBox: { x: 20, y: 100, width: 400, height: 40 },
+          }),
+        ],
       },
       { type: 'SVG', name: 'icon', x: 400, y: 20, width: 24, height: 24, svg: '<svg xmlns="http://www.w3.org/2000/svg"/>' },
       { type: 'SVG', name: 'bad', x: 400, y: 60, width: 24, height: 24, svg: '<<roto' },
@@ -79,3 +88,15 @@ console.log(messages.map((m) => `${m.type}: ${m.text}`).join('\n'));
 const texts = created.filter((n) => n.type === 'TEXT');
 console.log('fuentes usadas:', [...new Set(texts.map((t) => `${t.fontName.family} ${t.fontName.style}`))].join(', '));
 if (last?.type !== 'done') process.exit(1);
+
+// El borde izquierdo del texto (x=120) cae al 25 % de la caja (20..420): t debe ser 0.25.
+if (!process.argv[2]) {
+  const grad = texts.find((t) => t.name === 'grad');
+  const [[a, b, c]] = grad.fills[0].gradientTransform;
+  const tAt = (px, py) => a * px + b * py + c;
+  const expectLeft = (120 - 20) / 400;
+  const expectRight = (120 + grad.width - 20) / 400;
+  const ok = Math.abs(tAt(0, 0.5) - expectLeft) < 1e-9 && Math.abs(tAt(1, 0.5) - expectRight) < 1e-9;
+  console.log(`degradado en texto: t=${tAt(0, 0.5).toFixed(3)}..${tAt(1, 0.5).toFixed(3)} (esperado ${expectLeft.toFixed(3)}..${expectRight.toFixed(3)})`);
+  if (!ok) process.exit(1);
+}

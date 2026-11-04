@@ -65,6 +65,7 @@ async function inlineOne(src: string): Promise<string> {
 }
 
 function collectImagePaints(node: CapturedNode, out: Paint[]) {
+  if (node.type === 'TEXT') for (const fill of node.fills ?? []) if (fill.type === 'IMAGE') out.push(fill);
   if (node.type !== 'FRAME') return;
   for (const fill of node.fills) if (fill.type === 'IMAGE') out.push(fill);
   for (const child of node.children) collectImagePaints(child, out);

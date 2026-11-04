@@ -19,6 +19,10 @@
   .hidden { display: none; }
   input { font: 14px system-ui; padding: 8px 12px; border: 1px solid #bbb; border-radius: 6px; width: 240px; }
   .inline { width: 260px; padding: 0 32px; }
+  .grad-text { font-size: 40px; font-weight: 800; margin: 24px 32px; width: 520px;
+    background: linear-gradient(90deg, #ff5f6d, #845ec2); -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent; }
+  .grad-text span { font-style: italic; }
 </style>
 </head>
 <body>
@@ -42,6 +46,7 @@
     <div class="card"><h3>Tarjeta tres</h3><input placeholder="tu@correo.com" /></div>
   </div>
   <p class="inline">Un párrafo con un <a href="#">enlace que ocupa más de una línea dentro del texto</a> y sigue después.</p>
+  <h2 class="grad-text">Texto con degradado <span>enmascarado</span> en dos líneas</h2>
   <div class="hidden">No debería aparecer</div>
   <script src="/dist/capture.js" data-no-autorun></script>
 </body>

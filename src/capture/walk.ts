@@ -1,5 +1,5 @@
 // Recorre el DOM renderizado y produce el árbol de nodos del esquema.
-import type { CapturedNode, FrameNode, Paint, SvgNode, TextNode } from '../shared/schema';
+import type { Box, CapturedNode, FrameNode, Paint, SvgNode, TextNode } from '../shared/schema';
 import { backgroundPaints, borderOf, parseColor, radiiOf, shadowsOf, splitTopLevel } from './css';
 
 const SKIP_TAGS = new Set([
@@ -19,6 +19,21 @@ interface Ctx {
   scrollX: number;
   scrollY: number;
   count: number;
+}
+
+/** Fondo de un ancestro con `background-clip: text`, que se pinta dentro de las letras. */
+interface TextPaint {
+  paints: Paint[];
+  box: Box;
+}
+
+function clipsToText(style: CSSStyleDeclaration): boolean {
+  return style.backgroundClip === 'text' || style.getPropertyValue('-webkit-background-clip') === 'text';
+}
+
+function withTextPaint(nodes: TextNode[], textPaint: TextPaint | undefined): TextNode[] {
+  if (!textPaint) return nodes;
+  return nodes.map((n) => ({ ...n, fills: textPaint.paints, fillBox: textPaint.box }));
 }
 
 function absRect(rect: DOMRect, ctx: Ctx) {
@@ -108,7 +123,11 @@ function makeText(
   };
 }
 
-function captureTextNode(textNode: Text, parentStyle: CSSStyleDeclaration, ctx: Ctx): TextNode[] {
+function captureTextNode(textNode: Text, parentStyle: CSSStyleDeclaration, ctx: Ctx, textPaint?: TextPaint): TextNode[] {
+  return withTextPaint(captureTextLines(textNode, parentStyle, ctx), textPaint);
+}
+
+function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx: Ctx): TextNode[] {
   const raw = textNode.textContent ?? '';
   if (!raw.trim()) return [];
 
@@ -276,7 +295,7 @@ function childNodesOf(el: Element): Node[] {
   return nodes;
 }
 
-function walkElement(el: Element, ctx: Ctx, isRoot = false): CapturedNode[] {
+function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?: TextPaint): CapturedNode[] {
   if (SKIP_TAGS.has(el.tagName) || ctx.options.ignore?.includes(el)) return [];
   if (++ctx.count > MAX_NODES) return [];
 
@@ -295,7 +314,15 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false): CapturedNode[] {
   }
   if (el instanceof SVGElement) return []; // SVG suelto fuera de <svg>
 
-  const fills = isRoot ? [] : [...backgroundPaints(style), ...replacedContentPaints(el, style)];
+  // Con `background-clip: text` el fondo no pinta la caja: se ve solo dentro de las
+  // letras (propias y de los descendientes). Lo trasladamos a las capas de texto.
+  let textPaint = inheritedTextPaint;
+  let backgrounds = isRoot ? [] : backgroundPaints(style);
+  if (!isRoot && clipsToText(style) && backgrounds.length) {
+    textPaint = { paints: backgrounds, box: rect };
+    backgrounds = [];
+  }
+  const fills = isRoot ? [] : [...backgrounds, ...replacedContentPaints(el, style)];
   const border = borderOf(style);
   const shadows = shadowsOf(style);
   const clip = !isRoot && [style.overflowX, style.overflowY].some((o) => o !== 'visible');
@@ -322,9 +349,9 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false): CapturedNode[] {
   if (!(el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
     for (const child of childNodesOf(el)) {
       if (child.nodeType === Node.TEXT_NODE) {
-        frame.children.push(...captureTextNode(child as Text, style, ctx));
+        frame.children.push(...captureTextNode(child as Text, style, ctx, textPaint));
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        frame.children.push(...walkElement(child as Element, ctx));
+        frame.children.push(...walkElement(child as Element, ctx, false, textPaint));
       }
     }
   }

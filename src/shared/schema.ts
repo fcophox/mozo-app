@@ -3,6 +3,13 @@
 
 export const SCHEMA_VERSION = 1;
 
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface RGBA {
   r: number; // 0..1
   g: number;
@@ -91,6 +98,13 @@ export interface TextNode extends BaseNode {
   textCase: 'ORIGINAL' | 'UPPER' | 'LOWER' | 'TITLE';
   textDecoration: 'NONE' | 'UNDERLINE' | 'STRIKETHROUGH';
   wrap: boolean; // true = ancho fijo con salto de línea; false = una sola línea
+  /**
+   * Rellenos del texto cuando el elemento usa `background-clip: text` (texto con
+   * degradado o imagen). Sustituyen a `color`. Las pinturas están definidas sobre
+   * `fillBox` (la caja del elemento que declara el fondo), no sobre el texto.
+   */
+  fills?: Paint[];
+  fillBox?: Box;
 }
 
 export interface SvgNode extends BaseNode {

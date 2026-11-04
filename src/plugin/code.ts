@@ -1,5 +1,5 @@
 // Hilo principal del plugin: convierte una captura (JSON) en nodos de Figma.
-import type { Capture, CapturedNode, FrameNode as CapturedFrame, Paint as CapturedPaint, RGBA, TextNode as CapturedText } from '../shared/schema';
+import type { Box, Capture, CapturedNode, FrameNode as CapturedFrame, Paint as CapturedPaint, RGBA, TextNode as CapturedText } from '../shared/schema';
 import { SCHEMA_VERSION } from '../shared/schema';
 import { FontResolver } from './fonts';
 
@@ -47,16 +47,40 @@ function gradientTransform(angleDeg: number): Transform {
   ];
 }
 
-async function toFigmaPaint(paint: CapturedPaint): Promise<Paint> {
+/**
+ * Matriz que lleva el espacio unitario de `node` al espacio unitario de `box`.
+ * Sirve para pintar sobre una capa un degradado definido en otra caja (p. ej. el
+ * texto de un elemento con `background-clip: text`, partido en varias líneas).
+ */
+function boxMapping(node: Box, box: Box): Transform {
+  const w = box.width || 1;
+  const h = box.height || 1;
+  return [
+    [node.width / w, 0, (node.x - box.x) / w],
+    [0, node.height / h, (node.y - box.y) / h],
+  ];
+}
+
+/** Composición afín a ∘ b (primero b, luego a). */
+function compose(a: Transform, b: Transform): Transform {
+  return [
+    [a[0][0] * b[0][0] + a[0][1] * b[1][0], a[0][0] * b[0][1] + a[0][1] * b[1][1], a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2]],
+    [a[1][0] * b[0][0] + a[1][1] * b[1][0], a[1][0] * b[0][1] + a[1][1] * b[1][1], a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2]],
+  ];
+}
+
+async function toFigmaPaint(paint: CapturedPaint, mapping?: Transform): Promise<Paint> {
   switch (paint.type) {
     case 'SOLID':
       return { type: 'SOLID', color: rgb(paint.color), opacity: paint.color.a };
-    case 'LINEAR_GRADIENT':
+    case 'LINEAR_GRADIENT': {
+      const transform = gradientTransform(paint.angle);
       return {
         type: 'GRADIENT_LINEAR',
-        gradientTransform: gradientTransform(paint.angle),
+        gradientTransform: mapping ? compose(transform, mapping) : transform,
         gradientStops: paint.stops.map((s) => ({ position: s.position, color: { ...rgb(s.color), a: s.color.a } })),
       };
+    }
     case 'IMAGE': {
       const image = await loadImage(paint.src);
       return image ? { type: 'IMAGE', imageHash: image.hash, scaleMode: paint.scaleMode } : PLACEHOLDER;
@@ -85,7 +109,7 @@ async function buildFrame(data: CapturedFrame, origin: Origin, fonts: FontResolv
   frame.x = data.x - origin.x;
   frame.y = data.y - origin.y;
   frame.resize(Math.max(data.width, 0.01), Math.max(data.height, 0.01));
-  frame.fills = await Promise.all(data.fills.map(toFigmaPaint));
+  frame.fills = await Promise.all(data.fills.map((p) => toFigmaPaint(p)));
   frame.clipsContent = data.clip;
   if (data.opacity !== undefined) frame.opacity = data.opacity;
 
@@ -130,7 +154,7 @@ async function buildFrame(data: CapturedFrame, origin: Origin, fonts: FontResolv
   return frame;
 }
 
-function buildText(data: CapturedText, origin: Origin, fonts: FontResolver): TextNode | null {
+async function buildText(data: CapturedText, origin: Origin, fonts: FontResolver): Promise<TextNode | null> {
   if (!data.characters) return null;
   const text = figma.createText();
   text.fontName = fonts.resolve(data);
@@ -139,7 +163,6 @@ function buildText(data: CapturedText, origin: Origin, fonts: FontResolver): Tex
   text.fontSize = Math.max(1, data.fontSize);
   text.lineHeight = data.lineHeight ? { value: data.lineHeight, unit: 'PIXELS' } : { unit: 'AUTO' };
   text.letterSpacing = { value: data.letterSpacing, unit: 'PIXELS' };
-  text.fills = [{ type: 'SOLID', color: rgb(data.color), opacity: data.color.a }];
   text.textCase = data.textCase;
   text.textDecoration = data.textDecoration;
   if (data.opacity !== undefined) text.opacity = data.opacity;
@@ -158,6 +181,16 @@ function buildText(data: CapturedText, origin: Origin, fonts: FontResolver): Tex
     if (data.textAlign === 'CENTER') text.x = x + (data.width - text.width) / 2;
     else if (data.textAlign === 'RIGHT') text.x = x + data.width - text.width;
     else text.x = x;
+  }
+
+  if (data.fills?.length && data.fillBox) {
+    // Texto con degradado/imagen: la pintura se define sobre la caja del elemento
+    // que declara el fondo, así que la reproyectamos sobre la caja final del texto.
+    const box = data.fillBox;
+    const bounds = { x: text.x + origin.x, y: text.y + origin.y, width: text.width, height: text.height };
+    text.fills = await Promise.all(data.fills.map((p) => toFigmaPaint(p, boxMapping(bounds, box))));
+  } else {
+    text.fills = [{ type: 'SOLID', color: rgb(data.color), opacity: data.color.a }];
   }
   return text;
 }
