@@ -8,7 +8,7 @@ mano a Figma Community o a GitHub.
 
 | Archivo | Formato y tamaño | Dónde aparece |
 | --- | --- | --- |
-| `logo/mozo-symbol.svg` | SVG cuadrado (`viewBox="0 0 24 24"` o similar), sin texto | Cabecera del plugin (24 px), panel del capturador (20 px) y favicon de la página de instalación |
+| `logo/mozo-symbol.svg` | SVG cuadrado (`viewBox="0 0 24 24"` o similar), sin texto | Cabecera del plugin (24 px), panel del capturador (20 px) y favicon de la página de instalación (los PNG `logo/favicon-32.png` y `logo/apple-touch-icon-180.png` se regeneran con `node scripts/favicons.mjs`) |
 | `logo/mozo-logo.svg` | SVG horizontal (isotipo + "Mozō") | Página de instalación del marcador (48 px de alto) |
 | `brand.json` → `colors.primary` / `colors.onPrimary` | Hex | Botones del plugin, del panel y de la página de instalación |
 

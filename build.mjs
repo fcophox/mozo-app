@@ -14,11 +14,18 @@ for (const [file, svg] of [['mozo-symbol.svg', symbolSvg], ['mozo-logo.svg', log
   if (!svg) console.warn(`! brand/logo/${file} no existe: se usa el nombre en texto`);
 }
 
+// PNG generados con scripts/favicons.mjs: respaldo para navegadores sin favicon SVG.
+const readPng = (path) => readFile(path).then((b) => `data:image/png;base64,${b.toString('base64')}`).catch(() => '');
+const faviconPng = await readPng('brand/logo/favicon-32.png');
+const touchIconPng = await readPng('brand/logo/apple-touch-icon-180.png');
+
 /** Sustituye los marcadores __MOZO_*__ de las plantillas HTML. */
 function applyBrand(html) {
-  const favicon = symbolSvg
-    ? `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(symbolSvg)}" />`
-    : '';
+  const favicon = [
+    faviconPng && `<link rel="icon" type="image/png" sizes="32x32" href="${faviconPng}" />`,
+    symbolSvg && `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(symbolSvg)}" />`,
+    touchIconPng && `<link rel="apple-touch-icon" href="${touchIconPng}" />`,
+  ].filter(Boolean).join('\n');
   return html
     .replace('__MOZO_LOGO__<span class="sr">Mozō</span>', logoSvg ? `${logoSvg}<span class="sr">${brand.name}</span>` : brand.name)
     .replaceAll('__MOZO_MARK__', symbolSvg)

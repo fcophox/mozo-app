@@ -15,7 +15,9 @@ __MOZO_FAVICON__
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   p, li { color: var(--muted); }
   .bookmarklet { display: inline-block; margin: 16px 0; padding: 12px 20px; border-radius: 10px;
-    background: var(--brand); color: var(--on-brand); font-weight: 600; text-decoration: none; cursor: grab; }
+    background: var(--brand); color: var(--on-brand); font-weight: 600; text-decoration: none; cursor: grab;
+    display: inline-flex; align-items: center; gap: 10px; }
+  .bookmarklet svg { width: 24px; height: 24px; border-radius: 6px; flex: none; }
   .card { background: var(--card); border-radius: 12px; padding: 4px 20px; margin-top: 24px; }
 </style>
 </head>
@@ -23,7 +25,7 @@ __MOZO_FAVICON__
 <main>
   <h1>__MOZO_LOGO__<span class="sr">Mozō</span></h1>
   <p>Arrastra este botón a tu barra de marcadores:</p>
-  <a class="bookmarklet" href="__BOOKMARKLET__">Mozō</a>
+  <a class="bookmarklet" href="__BOOKMARKLET__">__MOZO_MARK__Mozō</a>
   <div class="card">
     <ol>
       <li>Abre la página que quieras importar y ajusta el ancho de la ventana (será el ancho del frame).</li>
