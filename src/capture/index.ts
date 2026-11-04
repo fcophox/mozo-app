@@ -4,9 +4,14 @@ import { SCHEMA_VERSION, type Capture } from '../shared/schema';
 import { inlineImages } from './images';
 import { capturePage } from './walk';
 
+// Identidad de marca, inyectada por build.mjs desde brand/.
+declare const MOZO_MARK: string;
+declare const MOZO_PRIMARY: string;
+declare const MOZO_ON_PRIMARY: string;
+
 declare global {
   interface Window {
-    __htmlToFigma?: { capture: typeof capture };
+    __mozo?: { capture: typeof capture };
   }
 }
 
@@ -45,7 +50,7 @@ function countNodes(capture: Capture): number {
 function showPanel() {
   panel?.remove();
   panel = document.createElement('div');
-  panel.setAttribute('data-html-to-figma', '');
+  panel.setAttribute('data-mozo', '');
   const shadow = panel.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>
@@ -53,16 +58,17 @@ function showPanel() {
       .box { position: fixed; z-index: 2147483647; top: 16px; right: 16px; width: 280px;
         font: 13px/1.4 system-ui, -apple-system, sans-serif; color: #1e1e1e; background: #fff;
         border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.24); padding: 14px; }
-      h1 { font-size: 14px; margin: 0 0 6px; }
+      h1 { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 0 0 6px; }
+      h1 svg { width: 20px; height: 20px; flex: none; }
       p { margin: 0 0 10px; color: #555; }
       .row { display: flex; gap: 8px; }
       button { flex: 1; font: inherit; border: 0; border-radius: 8px; padding: 8px; cursor: pointer;
-        background: #0d99ff; color: #fff; }
+        background: ${MOZO_PRIMARY}; color: ${MOZO_ON_PRIMARY}; }
       button.secondary { background: #eee; color: #1e1e1e; flex: 0 0 auto; }
       button:disabled { opacity: .5; cursor: default; }
     </style>
-    <div class="box" role="dialog" aria-label="HTML a Figma">
-      <h1>HTML → Figma</h1>
+    <div class="box" role="dialog" aria-label="Mozō">
+      <h1>${MOZO_MARK}Mozō</h1>
       <p class="status">Capturando…</p>
       <div class="row">
         <button class="copy" disabled>Copiar JSON</button>
@@ -101,15 +107,15 @@ async function run() {
     downloadBtn.addEventListener('click', () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      a.download = `${(location.hostname || 'pagina').replace(/\W+/g, '-')}.figma.json`;
+      a.download = `${(location.hostname || 'pagina').replace(/\W+/g, '-')}.mozo.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     });
   } catch (error) {
     setStatus(`Error: ${(error as Error).message}`);
-    console.error('[html-to-figma]', error);
+    console.error('[mozo]', error);
   }
 }
 
-window.__htmlToFigma = { capture };
+window.__mozo = { capture };
 if (!(document.currentScript as HTMLScriptElement | null)?.dataset.noAutorun) void run();

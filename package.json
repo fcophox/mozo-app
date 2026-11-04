@@ -1,8 +1,8 @@
 {
-  "name": "html-to-figma",
+  "name": "mozo",
   "version": "0.1.0",
   "private": true,
-  "description": "Captura páginas web (DOM + estilos calculados) y las importa como capas editables en Figma.",
+  "description": "Mozō: captura páginas web (DOM + estilos calculados) y las importa como capas editables en Figma.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

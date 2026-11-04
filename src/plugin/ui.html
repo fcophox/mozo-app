@@ -3,19 +3,22 @@
 <head>
 <meta charset="utf-8" />
 <style>
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light dark; --mozo-primary: __MOZO_PRIMARY__; --mozo-on-primary: __MOZO_ON_PRIMARY__; }
   body {
     margin: 0; padding: 14px; font: 12px/1.45 Inter, system-ui, sans-serif;
     color: var(--figma-color-text, #1e1e1e); background: var(--figma-color-bg, #fff);
     display: flex; flex-direction: column; gap: 10px; height: 100vh; box-sizing: border-box;
   }
-  h1 { font-size: 13px; margin: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand svg { width: 24px; height: 24px; flex: none; }
+  h1 { font-size: 14px; margin: 0; }
+  .lead { color: inherit; font-weight: 500; }
   p { margin: 0; color: var(--figma-color-text-secondary, #666); }
   .drop {
     flex: 1; display: flex; flex-direction: column; border: 1px dashed var(--figma-color-border, #ccc);
     border-radius: 8px; overflow: hidden;
   }
-  .drop.over { border-color: var(--figma-color-border-brand, #0d99ff); background: var(--figma-color-bg-brand-tertiary, #e5f4ff); }
+  .drop.over { border-color: var(--mozo-primary); background: var(--figma-color-bg-brand-tertiary, #e5f4ff); }
   textarea {
     flex: 1; resize: none; border: 0; padding: 10px; font: 11px/1.4 ui-monospace, Menlo, monospace;
     background: transparent; color: inherit; outline: none;
@@ -23,7 +26,7 @@
   .row { display: flex; gap: 8px; align-items: center; }
   button {
     font: inherit; font-weight: 500; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer;
-    background: var(--figma-color-bg-brand, #0d99ff); color: var(--figma-color-text-onbrand, #fff);
+    background: var(--mozo-primary); color: var(--mozo-on-primary);
   }
   button.secondary { background: var(--figma-color-bg-secondary, #eee); color: inherit; }
   button:disabled { opacity: .5; cursor: default; }
@@ -33,8 +36,9 @@
 </style>
 </head>
 <body>
-  <h1>Importar página web</h1>
-  <p>Ejecuta el capturador en la página, copia el JSON y pégalo aquí, o suelta el archivo <code>.figma.json</code>.</p>
+  <header class="brand">__MOZO_MARK__<h1>Mozō</h1></header>
+  <p class="lead">Importar página web</p>
+  <p>Ejecuta el capturador en la página, copia el JSON y pégalo aquí, o suelta el archivo <code>.mozo.json</code>.</p>
   <div class="drop" id="drop">
     <textarea id="json" placeholder="Pega aquí el JSON de la captura…" spellcheck="false"></textarea>
   </div>

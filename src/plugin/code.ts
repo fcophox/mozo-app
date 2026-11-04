@@ -196,7 +196,7 @@ function collectTexts(node: CapturedNode, out: CapturedText[]) {
 
 async function importCapture(capture: Capture) {
   if (capture?.version !== SCHEMA_VERSION || !capture.root) {
-    throw new Error('El JSON no es una captura válida de html-to-figma (o es de otra versión).');
+    throw new Error('El JSON no es una captura válida de Mozō (o es de otra versión).');
   }
   created = 0;
   failedImages = 0;

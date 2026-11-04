@@ -1,4 +1,4 @@
-# html-to-figma
+# Mozō
 
 Convierte páginas web en capas editables de Figma: frames con fondos, degradados, bordes,
 radios y sombras; texto real y editable; imágenes y SVG.
@@ -18,7 +18,7 @@ npm run build
 
 ### Capturador (bookmarklet)
 
-Abre `dist/install.html` en el navegador y arrastra el botón **→ Figma** a la barra de marcadores.
+Abre `dist/install.html` en el navegador y arrastra el botón **Mozō** a la barra de marcadores.
 
 Si la página bloquea el bookmarklet (CSP), pega el contenido de `dist/capture.js` en la consola de
 DevTools: hace exactamente lo mismo.
@@ -31,15 +31,15 @@ En Figma Desktop: **Plugins → Development → Import plugin from manifest…**
 ## Uso
 
 1. Abre la página y ajusta el ancho de la ventana: será el ancho del frame en Figma.
-2. Pulsa el marcador **→ Figma** y espera a que termine (procesa también las imágenes).
+2. Pulsa el marcador **Mozō** y espera a que termine (procesa también las imágenes).
 3. **Copiar JSON** o **Descargar**.
-4. En Figma: **Plugins → Development → HTML to Figma (local)**, pega el JSON (o suelta el archivo)
+4. En Figma: **Plugins → Development → Mozō**, pega el JSON (o suelta el archivo)
    y pulsa **Importar**.
 
 También puedes capturar desde código:
 
 ```js
-const capture = await window.__htmlToFigma.capture({ flatten: true, inlineImages: true });
+const capture = await window.__mozo.capture({ flatten: true, inlineImages: true });
 ```
 
 - `flatten`: omite los elementos sin estilo visual y sube sus hijos (árbol de capas más limpio).
@@ -74,6 +74,11 @@ const capture = await window.__htmlToFigma.capture({ flatten: true, inlineImages
 - El texto en línea que empieza a mitad de renglón (un enlace dentro de un párrafo) se divide en una
   capa por línea para conservar la posición exacta.
 
+## Marca
+
+El logo, el isotipo y los colores están en [`brand/`](brand/README.md), donde también está la lista de
+assets gráficos que hay que crear (icono y portada de Figma Community, social preview de GitHub…).
+
 ## Desarrollo
 
 ```bash
@@ -86,6 +91,7 @@ python3 test/serve.py 4174                 # sirve el proyecto con CORS, para pr
 Estructura:
 
 ```
+brand/                   identidad de Mozō (logos, colores, assets de publicación)
 src/shared/schema.ts     formato JSON intermedio
 src/capture/             capturador (navegador)
   walk.ts                recorrido del DOM, texto, SVG y formularios

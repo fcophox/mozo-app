@@ -1,6 +1,6 @@
 {
-  "name": "HTML to Figma (local)",
-  "id": "html-to-figma-local",
+  "name": "Mozō",
+  "id": "mozo-dev",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",

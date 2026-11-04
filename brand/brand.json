@@ -1,0 +1,8 @@
+{
+  "name": "Mozō",
+  "tagline": "Convierte cualquier página web en capas editables de Figma.",
+  "colors": {
+    "primary": "#0d99ff",
+    "onPrimary": "#ffffff"
+  }
+}

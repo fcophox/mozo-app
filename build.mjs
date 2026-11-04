@@ -1,14 +1,37 @@
-// Compila el capturador (bundle IIFE + bookmarklet) y el plugin de Figma.
+// Compila el capturador (bundle IIFE + bookmarklet) y el plugin de Figma de Mozō,
+// inyectando la identidad de marca de brand/.
 import * as esbuild from 'esbuild';
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const watch = process.argv.includes('--watch');
+
+// --- Marca: brand/brand.json + SVG de brand/logo (opcionales) ---------------
+const readOptional = (path) => readFile(path, 'utf8').catch(() => '');
+const brand = JSON.parse(await readFile('brand/brand.json', 'utf8'));
+const symbolSvg = (await readOptional('brand/logo/mozo-symbol.svg')).replace(/<\?xml[^>]*>\s*/, '').trim();
+const logoSvg = (await readOptional('brand/logo/mozo-logo.svg')).replace(/<\?xml[^>]*>\s*/, '').trim();
+for (const [file, svg] of [['mozo-symbol.svg', symbolSvg], ['mozo-logo.svg', logoSvg]]) {
+  if (!svg) console.warn(`! brand/logo/${file} no existe: se usa el nombre en texto`);
+}
+
+/** Sustituye los marcadores __MOZO_*__ de las plantillas HTML. */
+function applyBrand(html) {
+  const favicon = symbolSvg
+    ? `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(symbolSvg)}" />`
+    : '';
+  return html
+    .replace('__MOZO_LOGO__<span class="sr">Mozō</span>', logoSvg ? `${logoSvg}<span class="sr">${brand.name}</span>` : brand.name)
+    .replaceAll('__MOZO_MARK__', symbolSvg)
+    .replaceAll('__MOZO_FAVICON__', favicon)
+    .replaceAll('__MOZO_PRIMARY__', brand.colors.primary)
+    .replaceAll('__MOZO_ON_PRIMARY__', brand.colors.onPrimary);
+}
 
 async function writeBookmarklet() {
   const code = await readFile('dist/capture.js', 'utf8');
   const bookmarklet = `javascript:${encodeURIComponent(code)}`;
   await writeFile('dist/bookmarklet.txt', bookmarklet);
-  const page = (await readFile('src/capture/install.html', 'utf8')).replace('__BOOKMARKLET__', bookmarklet.replace(/"/g, '&quot;'));
+  const page = applyBrand(await readFile('src/capture/install.html', 'utf8')).replace('__BOOKMARKLET__', bookmarklet.replace(/"/g, '&quot;'));
   await writeFile('dist/install.html', page);
 }
 
@@ -34,6 +57,11 @@ const contexts = await Promise.all([
     format: 'iife',
     minify: true,
     target: 'chrome100',
+    define: {
+      MOZO_MARK: JSON.stringify(symbolSvg),
+      MOZO_PRIMARY: JSON.stringify(brand.colors.primary),
+      MOZO_ON_PRIMARY: JSON.stringify(brand.colors.onPrimary),
+    },
     plugins: [afterBuild('capturador', writeBookmarklet)],
   }),
   esbuild.context({
@@ -42,7 +70,7 @@ const contexts = await Promise.all([
     bundle: true,
     format: 'iife',
     target: 'es2017',
-    plugins: [afterBuild('plugin', () => copyFile('src/plugin/ui.html', 'plugin/dist/ui.html'))],
+    plugins: [afterBuild('plugin', async () => writeFile('plugin/dist/ui.html', applyBrand(await readFile('src/plugin/ui.html', 'utf8'))))],
   }),
 ]);
 
