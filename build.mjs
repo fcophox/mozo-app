@@ -56,6 +56,7 @@ const contexts = await Promise.all([
     bundle: true,
     format: 'iife',
     minify: true,
+    charset: 'ascii', // el bookmarklet no debe llevar caracteres fuera de ASCII
     target: 'chrome100',
     define: {
       MOZO_MARK: JSON.stringify(symbolSvg),

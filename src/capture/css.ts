@@ -161,15 +161,19 @@ export function backgroundPaints(style: CSSStyleDeclaration): Paint[] {
     const layers = splitTopLevel(image);
     const sizes = splitTopLevel(style.backgroundSize);
     const repeats = splitTopLevel(style.backgroundRepeat);
+    const positions = splitTopLevel(style.backgroundPosition);
     // En CSS la primera capa queda arriba; en Figma es la última.
     for (let i = layers.length - 1; i >= 0; i--) {
       const layer = layers[i];
       const url = layer.match(/^url\(["']?(.*?)["']?\)$/);
       if (url) {
+        const size = sizes[i] ?? sizes[0] ?? 'auto';
+        const repeat = repeats[i] ?? repeats[0] ?? 'repeat';
         paints.push({
           type: 'IMAGE',
           src: url[1],
-          scaleMode: scaleModeFor(sizes[i] ?? sizes[0] ?? 'auto', repeats[i] ?? repeats[0] ?? 'repeat'),
+          scaleMode: scaleModeFor(size, repeat),
+          css: { size, position: positions[i] ?? positions[0] ?? '0% 0%', repeat },
         });
         continue;
       }

@@ -2,6 +2,7 @@
 // de ejecución sin abrir Figma. Uso: node test/plugin-mock.mjs [captura.json]
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { createFigmaMock } from './figma-mock.mjs';
 
 const PIXEL_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==';
 const text = (over) => ({
@@ -49,51 +50,13 @@ const sample = {
 };
 
 // --- figma simulado ---------------------------------------------------------
-const created = [];
-class Node {
-  constructor(type) { Object.assign(this, { type, children: [], x: 0, y: 0, width: 100, height: 100, id: String(created.length) }); created.push(this); }
-  resize(w, h) { if (!(w > 0 && h > 0)) throw new Error(`resize inválido ${w}x${h}`); this.width = w; this.height = h; }
-  appendChild(n) { this.children.push(n); n.parent = this; }
-  remove() { this.removed = true; }
-  setPluginData() {}
-}
-class Text extends Node {
-  set characters(v) { if (!this.fontName) throw new Error('fuente no asignada antes de characters'); this._c = v; this.width = v.length * 8; this.height = 20; }
-  get characters() { return this._c; }
-}
-for (const method of ['setRangeFontName', 'setRangeFontSize', 'setRangeLetterSpacing', 'setRangeTextCase', 'setRangeTextDecoration', 'setRangeFills']) {
-  Text.prototype[method] = function (start, end, value) {
-    if (!(start >= 0 && end <= this._c.length && start < end)) throw new Error(`${method}: rango inválido ${start}-${end}`);
-    (this.ranges ??= []).push([method, start, end, value]);
-  };
-}
-const page = new Node('PAGE');
-const messages = [];
-let onmessage;
-const figma = {
-  showUI() {},
-  ui: { postMessage: (m) => messages.push(m), set onmessage(fn) { onmessage = fn; } },
-  createFrame: () => { const n = new Node('FRAME'); page.appendChild(n); return n; },
-  createText: () => new Text('TEXT'),
-  createRectangle: () => new Node('RECTANGLE'),
-  createNodeFromSvg: (svg) => { if (!svg.startsWith('<svg')) throw new Error('svg inválido'); return new Node('FRAME'); },
-  createImage: (bytes) => { if (!(bytes instanceof Uint8Array)) throw new Error('bytes'); return { hash: 'h1' }; },
-  createImageAsync: async () => { throw new Error('red'); },
-  base64Decode: (s) => new Uint8Array(Buffer.from(s, 'base64')),
-  listAvailableFontsAsync: async () => ['Regular', 'Bold', 'Italic', 'Bold Italic'].flatMap((style) =>
-    ['Inter', 'Helvetica Neue'].map((family) => ({ fontName: { family, style } }))),
-  loadFontAsync: async () => {},
-  notify: () => {},
-  viewport: { center: { x: 0, y: 0 }, scrollAndZoomIntoView() {} },
-  currentPage: page,
-};
-Object.defineProperty(page, 'selection', { set() {}, get: () => [] });
+const { figma, created, messages, getOnMessage } = createFigmaMock();
 
 const code = await readFile(new URL('../plugin/dist/code.js', import.meta.url), 'utf8');
 vm.runInNewContext(code, { figma, __html__: '', setTimeout, console });
 
 const input = process.argv[2] ? JSON.parse(await readFile(process.argv[2], 'utf8')) : sample;
-await onmessage({ type: 'import', capture: input });
+await getOnMessage()({ type: 'import', capture: input });
 
 const last = messages.at(-1);
 console.log(messages.map((m) => `${m.type}: ${m.text}`).join('\n'));

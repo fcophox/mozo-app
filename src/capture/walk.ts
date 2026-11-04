@@ -1,6 +1,7 @@
 // Recorre el DOM renderizado y produce el árbol de nodos del esquema.
 import type { Box, CapturedNode, FrameNode, Paint, SvgNode, TextNode, TextRun } from '../shared/schema';
 import { backgroundPaints, borderOf, parseColor, radiiOf, shadowsOf, splitTopLevel } from './css';
+import { isIconText, PSEUDO_TAG, rasterizeText } from './pseudo';
 
 const SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'META', 'LINK', 'TITLE', 'BASE', 'SOURCE', 'TRACK', 'WBR',
@@ -42,6 +43,7 @@ function absRect(rect: DOMRect, ctx: Ctx) {
 
 function nameFor(el: Element): string {
   const tag = el.tagName.toLowerCase();
+  if (tag === PSEUDO_TAG && el.parentElement) return `${nameFor(el.parentElement)}::${(el as HTMLElement).dataset.pseudo}`;
   if (el.id) return `${tag}#${el.id}`;
   const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
   return cls ? `${tag}.${cls}` : tag;
@@ -127,6 +129,39 @@ function captureTextNode(textNode: Text, parentStyle: CSSStyleDeclaration, ctx: 
   return withTextPaint(captureTextLines(textNode, parentStyle, ctx), textPaint);
 }
 
+function contentBox(el: Element, style: CSSStyleDeclaration, ctx: Ctx): Box {
+  const b = absRect(el.getBoundingClientRect(), ctx);
+  const left = parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth);
+  const right = parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth);
+  return { ...b, x: b.x + left, width: b.width - left - right };
+}
+
+/** Icono de fuente (Font Awesome, fuentes propias...): se convierte en imagen. */
+function captureIconText(textNode: Text, style: CSSStyleDeclaration, ctx: Ctx): FrameNode[] {
+  const range = document.createRange();
+  range.selectNodeContents(textNode);
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return [];
+  const src = rasterizeText((textNode.textContent ?? '').trim(), style, rect.width, rect.height);
+  if (!src) return [];
+  return [{ type: 'FRAME', name: 'icono', ...absRect(rect, ctx), fills: [{ type: 'IMAGE', src, scaleMode: 'FILL' }], clip: false, children: [] }];
+}
+
+/** Orden de pintado de CSS (simplificado): negativos, flujo normal, posicionados, z-index. */
+function stackLevel(el: Element): number {
+  const style = getComputedStyle(el);
+  const z = parseInt(style.zIndex, 10);
+  const positioned = style.position !== 'static';
+  if (!Number.isNaN(z) && positioned) return z < 0 ? -1 : 1 + z;
+  return positioned ? 1 : 0;
+}
+
+/** Texto solo para lectores de pantalla (patrón .sr-only / .visually-hidden). */
+function isVisuallyHidden(style: CSSStyleDeclaration, rect: Box): boolean {
+  if (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)') return true;
+  return rect.width <= 1 && rect.height <= 1 && style.overflowX !== 'visible';
+}
+
 function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx: Ctx): TextNode[] {
   const raw = textNode.textContent ?? '';
   if (!raw.trim()) return [];
@@ -151,7 +186,15 @@ function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx:
   const center = (l: DOMRect) => l.left + l.width / 2;
   const sameCenter = base.textAlign === 'CENTER' && lines.every((l) => Math.abs(center(l) - center(lines[0])) < 2);
   if (sameLeft || sameCenter || whiteSpace.startsWith('pre')) {
-    return [makeText(text, absRect(bounds, ctx), lines.length, base, true)];
+    const box = absRect(bounds, ctx);
+    const parent = textNode.parentElement;
+    if (parent && !parentStyle.display.startsWith('inline')) {
+      // El ancho disponible es la caja de contenido del bloque, no el de la línea más larga.
+      const content = contentBox(parent, parentStyle, ctx);
+      box.x = content.x;
+      box.width = content.width;
+    }
+    return [makeText(text, box, lines.length, base, true)];
   }
 
   // Texto en línea que empieza a mitad de renglón (p. ej. un <a> dentro de un
@@ -206,6 +249,7 @@ function isPureInline(el: Element): boolean {
   const style = getComputedStyle(el);
   if (style.display === 'none') return true; // se omite al recoger el texto
   if (style.display !== 'inline' && style.display !== 'contents') return false;
+  if (isIconText(el.textContent ?? '', style)) return false; // se rasteriza aparte
   if (style.position === 'absolute' || style.position === 'fixed' || parseFloat(style.opacity) < 1) return false;
   // Márgenes o rellenos horizontales crean huecos que un texto de Figma no puede expresar.
   const gaps = ['margin-left', 'margin-right', 'padding-left', 'padding-right'];
@@ -432,6 +476,7 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   if (opacity === 0) return [];
 
   const rect = absRect(el.getBoundingClientRect(), ctx);
+  if (isVisuallyHidden(style, rect)) return [];
 
   if (el instanceof SVGSVGElement) {
     if (rect.width === 0 || rect.height === 0) return [];
@@ -475,14 +520,20 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
 
   if (!(el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
     // Los nodos de texto y elementos en línea "puros" consecutivos forman un párrafo.
+    // Cada hijo lleva su nivel de apilado para reordenarlos como los pinta CSS.
+    const layers: { level: number; nodes: CapturedNode[] }[] = [];
     let group: Node[] = [];
     const flush = () => {
       const meaningful = group.filter((n) => n.nodeType !== Node.COMMENT_NODE);
       if (meaningful.length === 1 && meaningful[0].nodeType === Node.TEXT_NODE) {
-        frame.children.push(...captureTextNode(meaningful[0] as Text, style, ctx, textPaint));
+        const textNode = meaningful[0] as Text;
+        const nodes = isIconText(textNode.textContent ?? '', style)
+          ? captureIconText(textNode, style, ctx)
+          : captureTextNode(textNode, style, ctx, textPaint);
+        layers.push({ level: 0, nodes });
       } else if (meaningful.length) {
         const text = captureInlineGroup(meaningful, el, style, ctx, textPaint);
-        if (text) frame.children.push(text);
+        if (text) layers.push({ level: 0, nodes: [text] });
       }
       group = [];
     };
@@ -491,12 +542,14 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
         group.push(child);
       } else if (child instanceof Element && isPureInline(child)) {
         group.push(child);
-      } else if (child.nodeType === Node.ELEMENT_NODE) {
+      } else if (child instanceof Element) {
         flush();
-        frame.children.push(...walkElement(child as Element, ctx, false, textPaint));
+        layers.push({ level: stackLevel(child), nodes: walkElement(child, ctx, false, textPaint) });
       }
     }
     flush();
+    // sort() es estable: dentro de un mismo nivel se conserva el orden del documento.
+    for (const layer of layers.sort((a, b) => a.level - b.level)) frame.children.push(...layer.nodes);
   }
 
   const hasVisual = fills.length > 0 || !!border || !!shadows || clip || opacity < 1 || !!control;

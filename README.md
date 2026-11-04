@@ -58,6 +58,10 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 | Texto: familia, peso, itálica, tamaño, `line-height`, `letter-spacing`, `text-transform`, subrayado y tachado, alineación | Capa de texto editable |
 | Párrafos con `<a>`, `<em>`, `<strong>`, `<br>`… | Una sola capa de texto con tramos de estilo (fuente, color, subrayado) |
 | `background-clip: text` (texto con degradado o imagen) | Relleno de degradado/imagen en las capas de texto, continuo entre líneas |
+| `::before` / `::after` (adornos, subrayados, imágenes) | Capas normales en su posición exacta |
+| Iconos de fuente (Font Awesome, Material Icons, fuentes propias) | Imagen del glifo a 2x |
+| `background-size` / `background-position` (`contain`, `cover`, px, %) | Imagen en su posición real, recortada a la caja |
+| `position` + `z-index` | Orden de capas como el apilado de CSS |
 | `<img>`, `<canvas>`, `poster` de `<video>`, SVG en línea (incluidos `<use>` de sprites) | Relleno de imagen / vector |
 | `<input>`, `<textarea>`, `<select>` | Frame + texto del valor o placeholder |
 | Shadow DOM y `<slot>` | Se recorren como DOM normal |
@@ -68,7 +72,8 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 - **Fuentes:** si la fuente no está instalada en Figma, se sustituye (el plugin te dice cuáles).
   Las genéricas (`sans-serif`, `system-ui`…) se mapean a Inter / SF Pro.
 - **Sin auto-layout:** todo se posiciona en absoluto, tal como se ve en la ventana.
-- No se capturan los pseudo-elementos `::before` / `::after`, `transform` (se usa la caja
+- Texto solo para lectores de pantalla (`.sr-only`, `.visually-hidden`) se omite.
+- No se capturan `transform` (se usa la caja
   resultante), `filter`, `mix-blend-mode`, los degradados radiales y cónicos (se aproximan con su
   primer color) ni el contenido de los `<iframe>` (quedan como un rectángulo gris).
 - Las imágenes de otro dominio sin CORS no se pueden incrustar; el plugin intenta descargarlas y, si
@@ -88,7 +93,13 @@ npm run watch       # recompila capturador y plugin al guardar
 npm run typecheck
 node test/plugin-mock.mjs [captura.json]   # ejecuta el plugin contra un `figma` simulado
 python3 test/serve.py 4174                 # sirve el proyecto con CORS, para probar test/fixture.html
+node scripts/capture-url.mjs <url> captures/pagina.json   # captura con tu Chrome sin interfaz (+ .png)
+node scripts/figma-chunks.mjs captures/pagina.json captures/pagina-bloques   # bloques para use_figma
+node test/chunks-mock.mjs captures/pagina-bloques          # verifica los bloques con el figma simulado
 ```
+
+`scripts/capture-url.mjs` usa el Chrome instalado (vía `playwright-core`, sin descargar navegadores).
+Las páginas con verificación anti-bots (Cloudflare) hay que capturarlas desde tu navegador.
 
 Estructura:
 

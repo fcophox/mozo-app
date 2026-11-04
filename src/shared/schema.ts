@@ -37,6 +37,14 @@ export interface ImagePaint {
   type: 'IMAGE';
   src: string; // data: URL (preferido) o URL remota
   scaleMode: 'FILL' | 'FIT' | 'TILE' | 'CROP';
+  /**
+   * Rectángulo (absoluto) donde el navegador dibuja la imagen de fondo, cuando no
+   * cubre exactamente la caja del elemento (background-size/position). Se recorta a
+   * la caja del elemento.
+   */
+  box?: Box;
+  /** Solo durante la captura: valores CSS para calcular `box`. */
+  css?: { size: string; position: string; repeat: string };
 }
 
 export type Paint = SolidPaint | LinearGradientPaint | ImagePaint;

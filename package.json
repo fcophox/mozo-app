@@ -12,6 +12,8 @@
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
     "esbuild": "^0.24.0",
+    "fflate": "^0.8.3",
+    "playwright-core": "^1.64.1",
     "typescript": "^5.6.0"
   }
 }

@@ -3,3 +3,4 @@ dist/
 plugin/dist/
 *.json.capture
 .claude/
+captures/

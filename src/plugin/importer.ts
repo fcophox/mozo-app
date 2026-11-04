@@ -1,6 +1,6 @@
 // Convierte una captura (JSON) en nodos de Figma. No depende de la UI del plugin,
 // así que también puede ejecutarse fuera de él (p. ej. desde pruebas).
-import type { Box, Capture, CapturedNode, FrameNode as CapturedFrame, Paint as CapturedPaint, RGBA, TextNode as CapturedText, TextStyle } from '../shared/schema';
+import type { Box, Capture, CapturedNode, FrameNode as CapturedFrame, ImagePaint, Paint as CapturedPaint, RGBA, TextNode as CapturedText, TextStyle } from '../shared/schema';
 import { SCHEMA_VERSION } from '../shared/schema';
 import { FontResolver } from './fonts';
 
@@ -99,6 +99,21 @@ interface Origin { x: number; y: number }
 let created = 0;
 let cancelled = false;
 
+// --- Imágenes diferidas ------------------------------------------------------
+// En importaciones por bloques (scripts externos con límite de tamaño) las imágenes
+// llegan como `mozo-asset:<clave>` y se suben después sobre el nodo indicado.
+
+export interface AssetTarget {
+  key: string;
+  nodeId: string;
+  scaleMode: 'FILL' | 'FIT' | 'TILE' | 'CROP';
+}
+
+const ASSET_PREFIX = 'mozo-asset:';
+let assetTargets: AssetTarget[] = [];
+const isDeferredImage = (p: CapturedPaint): p is Extract<CapturedPaint, { type: 'IMAGE' }> =>
+  p.type === 'IMAGE' && p.src.startsWith(ASSET_PREFIX);
+
 async function tick() {
   if (++created % 250 === 0) {
     onProgress(`Creando capas… ${created}`);
@@ -107,13 +122,84 @@ async function tick() {
   if (cancelled) throw new Error('Importación cancelada');
 }
 
+/**
+ * Imagen de fondo con posición/tamaño propios: un rectángulo en su sitio, dentro de
+ * un frame que la recorta a la caja del elemento cuando se sale de ella.
+ */
+async function buildBoxedImage(paint: ImagePaint, owner: CapturedFrame): Promise<SceneNode> {
+  const box = paint.box as Box;
+  const rect = figma.createRectangle();
+  rect.name = 'Imagen de fondo';
+  rect.resize(Math.max(box.width, 0.01), Math.max(box.height, 0.01));
+  if (paint.src.startsWith(ASSET_PREFIX)) {
+    rect.fills = [PLACEHOLDER];
+    assetTargets.push({ key: paint.src.slice(ASSET_PREFIX.length), nodeId: rect.id, scaleMode: 'FILL' });
+  } else {
+    rect.fills = [await toFigmaPaint({ type: 'IMAGE', src: paint.src, scaleMode: 'FILL' })];
+  }
+  const inside = box.x >= owner.x && box.y >= owner.y &&
+    box.x + box.width <= owner.x + owner.width && box.y + box.height <= owner.y + owner.height;
+  if (inside || owner.clip) {
+    rect.x = box.x - owner.x;
+    rect.y = box.y - owner.y;
+    return rect;
+  }
+  const clipper = figma.createFrame();
+  clipper.name = 'Fondo';
+  clipper.fills = [];
+  clipper.clipsContent = true;
+  clipper.resize(Math.max(owner.width, 0.01), Math.max(owner.height, 0.01));
+  if (owner.radii) {
+    clipper.topLeftRadius = owner.radii.topLeft;
+    clipper.topRightRadius = owner.radii.topRight;
+    clipper.bottomRightRadius = owner.radii.bottomRight;
+    clipper.bottomLeftRadius = owner.radii.bottomLeft;
+  }
+  clipper.appendChild(rect);
+  rect.x = box.x - owner.x;
+  rect.y = box.y - owner.y;
+  return clipper;
+}
+
 async function buildFrame(data: CapturedFrame, origin: Origin, fonts: FontResolver): Promise<FrameNode> {
   const frame = figma.createFrame();
   frame.name = data.name;
   frame.x = data.x - origin.x;
   frame.y = data.y - origin.y;
   frame.resize(Math.max(data.width, 0.01), Math.max(data.height, 0.01));
-  frame.fills = await Promise.all(data.fills.map((p) => toFigmaPaint(p)));
+  const boxed: ImagePaint[] = [];
+  const deferred: ImagePaint[] = [];
+  const regular: CapturedPaint[] = [];
+  for (const p of data.fills) {
+    if (p.type === 'IMAGE' && p.box) boxed.push(p);
+    else if (isDeferredImage(p)) deferred.push(p);
+    else regular.push(p);
+  }
+  frame.fills = await Promise.all(regular.map((p) => toFigmaPaint(p)));
+  for (const paint of boxed) frame.appendChild(await buildBoxedImage(paint, data));
+  if (deferred.length) {
+    if (regular.length === 0 && data.children.length === 0 && deferred.length === 1) {
+      // Un <img> típico: la imagen irá directamente en el frame.
+      frame.fills = [PLACEHOLDER];
+      assetTargets.push({ key: deferred[0].src.slice(ASSET_PREFIX.length), nodeId: frame.id, scaleMode: deferred[0].scaleMode });
+    } else {
+      // Fondo con más capas o con hijos: la imagen va en un rectángulo bajo los hijos.
+      for (const paint of deferred) {
+        const rect = figma.createRectangle();
+        rect.name = 'Imagen';
+        rect.resize(Math.max(data.width, 0.01), Math.max(data.height, 0.01));
+        rect.fills = [PLACEHOLDER];
+        if (data.radii) {
+          rect.topLeftRadius = data.radii.topLeft;
+          rect.topRightRadius = data.radii.topRight;
+          rect.bottomRightRadius = data.radii.bottomRight;
+          rect.bottomLeftRadius = data.radii.bottomLeft;
+        }
+        frame.appendChild(rect);
+        assetTargets.push({ key: paint.src.slice(ASSET_PREFIX.length), nodeId: rect.id, scaleMode: paint.scaleMode });
+      }
+    }
+  }
   frame.clipsContent = data.clip;
   if (data.opacity !== undefined) frame.opacity = data.opacity;
 
@@ -290,4 +376,68 @@ export async function importCapture(capture: Capture, progress: (text: string) =
   figma.viewport.scrollAndZoomIntoView([root]);
 
   return { root, layers: created, failedImages, substitutedFonts: substituted };
+}
+
+// --- Importación por bloques -------------------------------------------------
+// Para entornos que limitan el tamaño de cada ejecución: se crea primero el frame
+// raíz y luego cada bloque añade nodos a un frame ya existente, localizado por su
+// clave temporal ⟦k⟧ en el nombre. `finalizeChunks` quita esas claves al final.
+
+const keyTag = (key: string) => ` ⟦${key}⟧`;
+
+function findByKey(rootName: string, key: string | null): FrameNode {
+  const root = figma.currentPage.findChild((n) => n.type === 'FRAME' && n.name === rootName) as FrameNode | null;
+  if (!root) throw new Error(`No encuentro el frame raíz "${rootName}"`);
+  if (!key) return root;
+  const node = root.findOne((n) => n.type === 'FRAME' && n.name.endsWith(keyTag(key))) as FrameNode | null;
+  if (!node) throw new Error(`No encuentro el frame con clave ${key}`);
+  return node;
+}
+
+export async function createChunkRoot(rootName: string, root: CapturedFrame): Promise<string> {
+  const fonts = new FontResolver();
+  await fonts.init();
+  const frame = await buildFrame({ ...root, children: [] }, { x: 0, y: 0 }, fonts);
+  frame.name = rootName;
+  // A la derecha de lo que ya hay en la página.
+  const right = Math.max(0, ...figma.currentPage.children.filter((n) => n !== frame).map((n) => n.x + n.width));
+  frame.x = right + 200;
+  frame.y = 0;
+  return frame.id;
+}
+
+export interface ChunkItem {
+  node: CapturedNode;
+  /** Si se indica, el frame se crea sin hijos y se etiqueta con esta clave. */
+  shellKey?: string;
+}
+
+export async function importChunk(rootName: string, parentKey: string | null, origin: Origin, items: ChunkItem[]) {
+  created = 0;
+  cancelled = false;
+  assetTargets = [];
+  imageCache.clear();
+  const parent = findByKey(rootName, parentKey);
+
+  const fonts = new FontResolver();
+  await fonts.init();
+  const texts: Pick<TextStyle, 'fontFamilies' | 'fontWeight' | 'italic'>[] = [];
+  for (const item of items) collectTexts(item.node, texts);
+  await fonts.loadAll(texts);
+
+  for (const item of items) {
+    const data = item.shellKey && item.node.type === 'FRAME' ? { ...item.node, children: [] } : item.node;
+    const node = await buildNode(data, origin, fonts);
+    if (!node) continue;
+    if (item.shellKey) node.name += keyTag(item.shellKey);
+    parent.appendChild(node);
+  }
+  return { created, assets: assetTargets };
+}
+
+export function finalizeChunks(rootName: string) {
+  const root = findByKey(rootName, null);
+  const tagged = root.findAll((n) => / ⟦[^⟧]+⟧$/.test(n.name));
+  for (const node of tagged) node.name = node.name.replace(/ ⟦[^⟧]+⟧$/, '');
+  return { untagged: tagged.length };
 }

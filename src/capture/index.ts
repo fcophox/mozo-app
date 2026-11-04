@@ -1,7 +1,9 @@
 // Punto de entrada del capturador. Se ejecuta en la página (bookmarklet o consola):
 // captura el DOM, incrusta las imágenes y muestra un panel para copiar/descargar el JSON.
 import { SCHEMA_VERSION, type Capture } from '../shared/schema';
+import { resolveBackgroundBoxes } from './background';
 import { inlineImages } from './images';
+import { materializePseudoElements } from './pseudo';
 import { capturePage } from './walk';
 
 // Identidad de marca, inyectada por build.mjs desde brand/.
@@ -16,7 +18,15 @@ declare global {
 }
 
 export async function capture(options: { flatten?: boolean; inlineImages?: boolean } = {}): Promise<Capture> {
-  const root = capturePage({ flatten: options.flatten ?? true, ignore: panel ? [panel] : [] });
+  // Los pseudo-elementos se convierten temporalmente en elementos reales para medirlos.
+  const restore = materializePseudoElements();
+  let root;
+  try {
+    root = capturePage({ flatten: options.flatten ?? true, ignore: panel ? [panel] : [] });
+  } finally {
+    restore();
+  }
+  await resolveBackgroundBoxes(root);
   if (options.inlineImages ?? true) await inlineImages(root, (done, total) => setStatus(`Procesando imágenes ${done}/${total}…`));
   return {
     version: SCHEMA_VERSION,
