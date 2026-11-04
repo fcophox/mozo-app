@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 14px; font: 12px/1.45 Inter, system-ui, sans-serif;
+    color: var(--figma-color-text, #1e1e1e); background: var(--figma-color-bg, #fff);
+    display: flex; flex-direction: column; gap: 10px; height: 100vh; box-sizing: border-box;
+  }
+  h1 { font-size: 13px; margin: 0; }
+  p { margin: 0; color: var(--figma-color-text-secondary, #666); }
+  .drop {
+    flex: 1; display: flex; flex-direction: column; border: 1px dashed var(--figma-color-border, #ccc);
+    border-radius: 8px; overflow: hidden;
+  }
+  .drop.over { border-color: var(--figma-color-border-brand, #0d99ff); background: var(--figma-color-bg-brand-tertiary, #e5f4ff); }
+  textarea {
+    flex: 1; resize: none; border: 0; padding: 10px; font: 11px/1.4 ui-monospace, Menlo, monospace;
+    background: transparent; color: inherit; outline: none;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  button {
+    font: inherit; font-weight: 500; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer;
+    background: var(--figma-color-bg-brand, #0d99ff); color: var(--figma-color-text-onbrand, #fff);
+  }
+  button.secondary { background: var(--figma-color-bg-secondary, #eee); color: inherit; }
+  button:disabled { opacity: .5; cursor: default; }
+  label.file { cursor: pointer; text-decoration: underline; }
+  .status { min-height: 2.9em; }
+  .status.error { color: var(--figma-color-text-danger, #d32f2f); }
+</style>
+</head>
+<body>
+  <h1>Importar página web</h1>
+  <p>Ejecuta el capturador en la página, copia el JSON y pégalo aquí, o suelta el archivo <code>.figma.json</code>.</p>
+  <div class="drop" id="drop">
+    <textarea id="json" placeholder="Pega aquí el JSON de la captura…" spellcheck="false"></textarea>
+  </div>
+  <div class="row">
+    <button id="import">Importar</button>
+    <button id="cancel" class="secondary" hidden>Cancelar</button>
+    <label class="file">o elegir archivo<input id="file" type="file" accept=".json,application/json" hidden /></label>
+  </div>
+  <p class="status" id="status" role="status"></p>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const textarea = $('json'), importBtn = $('import'), cancelBtn = $('cancel'), status = $('status');
+
+  function setStatus(text, isError = false) {
+    status.textContent = text;
+    status.classList.toggle('error', isError);
+  }
+  function setBusy(busy) {
+    importBtn.disabled = busy;
+    cancelBtn.hidden = !busy;
+  }
+
+  function startImport(raw) {
+    let capture;
+    try {
+      capture = JSON.parse(raw);
+    } catch {
+      setStatus('El texto no es JSON válido.', true);
+      return;
+    }
+    setBusy(true);
+    setStatus('Importando…');
+    parent.postMessage({ pluginMessage: { type: 'import', capture } }, '*');
+  }
+
+  async function readFile(file) {
+    setStatus(`Leyendo ${file.name}…`);
+    startImport(await file.text());
+  }
+
+  importBtn.onclick = () => {
+    if (!textarea.value.trim()) return setStatus('Pega primero el JSON de la captura.', true);
+    startImport(textarea.value);
+  };
+  cancelBtn.onclick = () => parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
+  $('file').onchange = (e) => e.target.files[0] && readFile(e.target.files[0]);
+
+  const drop = $('drop');
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = (e) => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    const file = e.dataTransfer.files[0];
+    if (file) readFile(file);
+  };
+
+  onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'progress') setStatus(msg.text);
+    if (msg.type === 'done' || msg.type === 'error') {
+      setBusy(false);
+      setStatus(msg.text, msg.type === 'error');
+    }
+  };
+</script>
+</body>
+</html>

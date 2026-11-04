@@ -1,0 +1,5 @@
+node_modules/
+dist/
+plugin/dist/
+*.json.capture
+.claude/

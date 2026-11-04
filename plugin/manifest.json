@@ -1,0 +1,13 @@
+{
+  "name": "HTML to Figma (local)",
+  "id": "html-to-figma-local",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "Descarga las imágenes de las páginas capturadas que no pudieron incrustarse en el JSON."
+  }
+}

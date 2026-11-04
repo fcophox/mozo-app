@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capturador HTML → Figma</title>
+<style>
+  :root { --bg: #fafafa; --fg: #1e1e1e; --muted: #666; --brand: #0d99ff; --card: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1e1e1e; --fg: #f0f0f0; --muted: #aaa; --card: #2c2c2c; } }
+  body { margin: 0; padding: 48px 16px; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, sans-serif; }
+  main { max-width: 560px; margin: auto; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  p, li { color: var(--muted); }
+  .bookmarklet { display: inline-block; margin: 16px 0; padding: 12px 20px; border-radius: 10px;
+    background: var(--brand); color: #fff; font-weight: 600; text-decoration: none; cursor: grab; }
+  .card { background: var(--card); border-radius: 12px; padding: 4px 20px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Capturador HTML → Figma</h1>
+  <p>Arrastra este botón a tu barra de marcadores:</p>
+  <a class="bookmarklet" href="__BOOKMARKLET__">→ Figma</a>
+  <div class="card">
+    <ol>
+      <li>Abre la página que quieras importar y ajusta el ancho de la ventana (será el ancho del frame).</li>
+      <li>Haz clic en el marcador <strong>→ Figma</strong>.</li>
+      <li>Pulsa <strong>Copiar JSON</strong> (o <strong>Descargar</strong>).</li>
+      <li>En Figma: Plugins → Development → <strong>HTML to Figma (local)</strong>, pega y pulsa Importar.</li>
+    </ol>
+  </div>
+</main>
+</body>
+</html>
