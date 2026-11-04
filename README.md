@@ -1,4 +1,9 @@
-# Mozō
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/mozo-logo.svg" />
+    <img src="brand/logo/mozo-logo-on-light.svg" alt="Mozō" height="64" />
+  </picture>
+</h1>
 
 Convierte páginas web en capas editables de Figma: frames con fondos, degradados, bordes,
 radios y sombras; texto real y editable; imágenes y SVG.

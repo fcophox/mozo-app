@@ -10,6 +10,7 @@ mano a Figma Community o a GitHub.
 | --- | --- | --- |
 | `logo/mozo-symbol.svg` | SVG cuadrado (`viewBox="0 0 24 24"` o similar), sin texto | Cabecera del plugin (24 px), panel del capturador (20 px) y favicon de la página de instalación (los PNG `logo/favicon-32.png` y `logo/apple-touch-icon-180.png` se regeneran con `node scripts/favicons.mjs`) |
 | `logo/mozo-logo.svg` | SVG horizontal (isotipo + "Mozō") | Página de instalación del marcador (48 px de alto) |
+| `logo/mozo-logo-on-light.svg` | Igual, con el texto oscuro | README de GitHub en tema claro |
 | `brand.json` → `colors.primary` / `colors.onPrimary` | Hex | Botones del plugin, del panel y de la página de instalación |
 
 Recomendaciones para los SVG:
@@ -47,10 +48,10 @@ descripción, etiquetas y un contacto de soporte.
 
 ## Checklist
 
-- [ ] `logo/mozo-symbol.svg`
-- [ ] `logo/mozo-logo.svg`
+- [x] `logo/mozo-symbol.svg`
+- [x] `logo/mozo-logo.svg`
 - [ ] Colores definitivos en `brand.json`
-- [ ] `figma-community/icon-128.png`
+- [x] `figma-community/icon-128.png` (generado con `node scripts/favicons.mjs`)
 - [ ] `figma-community/cover-1920x960.png`
 - [ ] `figma-community/carousel/` (de 3 a 5 capturas)
 - [ ] `github/social-preview-1280x640.png`
