@@ -56,6 +56,7 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 | `box-shadow` (incluido `inset` y `spread`) | Drop shadow / Inner shadow |
 | `opacity`, `overflow` | Opacidad de capa, Clip content |
 | Texto: familia, peso, itálica, tamaño, `line-height`, `letter-spacing`, `text-transform`, subrayado y tachado, alineación | Capa de texto editable |
+| Párrafos con `<a>`, `<em>`, `<strong>`, `<br>`… | Una sola capa de texto con tramos de estilo (fuente, color, subrayado) |
 | `background-clip: text` (texto con degradado o imagen) | Relleno de degradado/imagen en las capas de texto, continuo entre líneas |
 | `<img>`, `<canvas>`, `poster` de `<video>`, SVG en línea (incluidos `<use>` de sprites) | Relleno de imagen / vector |
 | `<input>`, `<textarea>`, `<select>` | Frame + texto del valor o placeholder |
@@ -72,8 +73,8 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
   primer color) ni el contenido de los `<iframe>` (quedan como un rectángulo gris).
 - Las imágenes de otro dominio sin CORS no se pueden incrustar; el plugin intenta descargarlas y, si
   no puede, las deja en gris.
-- El texto en línea que empieza a mitad de renglón (un enlace dentro de un párrafo) se divide en una
-  capa por línea para conservar la posición exacta.
+- Los elementos en línea con fondo, borde o márgenes laterales (p. ej. una etiqueta o un enlace con
+  `margin`) se mantienen como capas aparte, porque un texto de Figma no puede expresar esos huecos.
 
 ## Marca
 

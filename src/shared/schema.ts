@@ -84,6 +84,26 @@ export interface FrameNode extends BaseNode {
   children: CapturedNode[];
 }
 
+/** Estilo de un tramo de texto. El `TextNode` lleva el estilo base (el del bloque). */
+export interface TextStyle {
+  fontFamilies: string[]; // lista de font-family en orden de preferencia
+  fontSize: number;
+  fontWeight: number;
+  italic: boolean;
+  letterSpacing: number; // px
+  color: RGBA;
+  textCase: 'ORIGINAL' | 'UPPER' | 'LOWER' | 'TITLE';
+  textDecoration: 'NONE' | 'UNDERLINE' | 'STRIKETHROUGH';
+  fills?: Paint[];
+  fillBox?: Box;
+}
+
+/** Tramo [start, end) de `characters` con estilo propio (p. ej. un <a> o <em>). */
+export interface TextRun extends TextStyle {
+  start: number;
+  end: number;
+}
+
 export interface TextNode extends BaseNode {
   type: 'TEXT';
   characters: string;
@@ -105,6 +125,8 @@ export interface TextNode extends BaseNode {
    */
   fills?: Paint[];
   fillBox?: Box;
+  /** Tramos con estilo distinto al base, cuando el párrafo mezcla estilos. */
+  runs?: TextRun[];
 }
 
 export interface SvgNode extends BaseNode {

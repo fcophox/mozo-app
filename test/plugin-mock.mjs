@@ -28,6 +28,12 @@ const sample = {
         children: [
           text({ x: 30, y: 30 }),
           text({ wrap: true, textAlign: 'LEFT', fontFamilies: ['Nope Font'], italic: true, lineHeight: null }),
+          // Párrafo con estilos mixtos: "Hola " normal + "mundo" en itálica azul subrayada.
+          text({
+            name: 'mixto', characters: 'Hola mundo', wrap: true,
+            runs: [{ start: 5, end: 10, fontFamilies: ['Helvetica Neue'], fontSize: 16, fontWeight: 400, italic: true, letterSpacing: 0,
+              color: { r: 0, g: 0, b: 1, a: 1 }, textCase: 'ORIGINAL', textDecoration: 'UNDERLINE' }],
+          }),
           // background-clip: text — degradado definido sobre una caja más ancha que el texto.
           text({
             name: 'grad', x: 120, y: 100, textAlign: 'LEFT', characters: 'Degradado',
@@ -54,6 +60,12 @@ class Node {
 class Text extends Node {
   set characters(v) { if (!this.fontName) throw new Error('fuente no asignada antes de characters'); this._c = v; this.width = v.length * 8; this.height = 20; }
   get characters() { return this._c; }
+}
+for (const method of ['setRangeFontName', 'setRangeFontSize', 'setRangeLetterSpacing', 'setRangeTextCase', 'setRangeTextDecoration', 'setRangeFills']) {
+  Text.prototype[method] = function (start, end, value) {
+    if (!(start >= 0 && end <= this._c.length && start < end)) throw new Error(`${method}: rango inválido ${start}-${end}`);
+    (this.ranges ??= []).push([method, start, end, value]);
+  };
 }
 const page = new Node('PAGE');
 const messages = [];
@@ -88,6 +100,10 @@ console.log(messages.map((m) => `${m.type}: ${m.text}`).join('\n'));
 const texts = created.filter((n) => n.type === 'TEXT');
 console.log('fuentes usadas:', [...new Set(texts.map((t) => `${t.fontName.family} ${t.fontName.style}`))].join(', '));
 if (last?.type !== 'done') process.exit(1);
+
+const mixed = texts.find((t) => t.name === 'mixto');
+console.log('tramos aplicados:', mixed.ranges.map(([m, a, b]) => `${m}[${a},${b})`).join(' '));
+if (mixed.ranges.length !== 6) process.exit(1);
 
 // El borde izquierdo del texto (x=120) cae al 25 % de la caja (20..420): t debe ser 0.25.
 if (!process.argv[2]) {

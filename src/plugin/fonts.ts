@@ -1,5 +1,7 @@
 // Resolución de fuentes CSS (familia + peso + itálica) a fuentes disponibles en Figma.
-import type { TextNode as CapturedText } from '../shared/schema';
+import type { TextStyle } from '../shared/schema';
+
+type FontRequest = Pick<TextStyle, 'fontFamilies' | 'fontWeight' | 'italic'>;
 
 const GENERIC_FALLBACKS: Record<string, string[]> = {
   'sans-serif': ['Inter'],
@@ -74,11 +76,11 @@ export class FontResolver {
     return best;
   }
 
-  key(text: Pick<CapturedText, 'fontFamilies' | 'fontWeight' | 'italic'>) {
+  key(text: FontRequest) {
     return `${text.fontFamilies.join(',')}|${text.fontWeight}|${text.italic}`;
   }
 
-  resolve(text: Pick<CapturedText, 'fontFamilies' | 'fontWeight' | 'italic'>): FontName {
+  resolve(text: FontRequest): FontName {
     const key = this.key(text);
     const cached = this.resolved.get(key);
     if (cached) return cached;
@@ -95,7 +97,7 @@ export class FontResolver {
   }
 
   /** Carga todas las fuentes necesarias; devuelve las familias que se sustituyeron. */
-  async loadAll(texts: CapturedText[]): Promise<string[]> {
+  async loadAll(texts: FontRequest[]): Promise<string[]> {
     const fonts = new Map<string, FontName>();
     const substituted = new Set<string>();
     for (const text of texts) {

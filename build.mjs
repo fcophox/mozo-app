@@ -72,6 +72,14 @@ const contexts = await Promise.all([
     target: 'es2017',
     plugins: [afterBuild('plugin', async () => writeFile('plugin/dist/ui.html', applyBrand(await readFile('src/plugin/ui.html', 'utf8'))))],
   }),
+  esbuild.context({
+    entryPoints: ['src/plugin/standalone.ts'],
+    outfile: 'dist/figma-standalone.js',
+    bundle: true,
+    format: 'iife',
+    minify: true,
+    target: 'es2017',
+  }),
 ]);
 
 if (watch) {

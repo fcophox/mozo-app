@@ -1,5 +1,5 @@
 // Recorre el DOM renderizado y produce el árbol de nodos del esquema.
-import type { Box, CapturedNode, FrameNode, Paint, SvgNode, TextNode } from '../shared/schema';
+import type { Box, CapturedNode, FrameNode, Paint, SvgNode, TextNode, TextRun } from '../shared/schema';
 import { backgroundPaints, borderOf, parseColor, radiiOf, shadowsOf, splitTopLevel } from './css';
 
 const SKIP_TAGS = new Set([
@@ -192,6 +192,133 @@ function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx:
   return result;
 }
 
+// --- Texto con estilos mixtos ----------------------------------------------
+// El contenido en línea de un bloque (texto, <a>, <em>, <strong>, <br>...) se
+// convierte en UNA capa de texto con tramos de estilo. Así Figma recoloca las
+// palabras con sus espacios reales aunque la fuente se sustituya por otra.
+
+const REPLACED_TAGS = new Set(['IMG', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'VIDEO', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'PICTURE']);
+
+/** Elemento en línea que solo aporta estilo de texto: sin caja visible ni huecos propios. */
+function isPureInline(el: Element): boolean {
+  if (el.tagName === 'BR') return true;
+  if (!(el instanceof HTMLElement) || REPLACED_TAGS.has(el.tagName)) return false;
+  const style = getComputedStyle(el);
+  if (style.display === 'none') return true; // se omite al recoger el texto
+  if (style.display !== 'inline' && style.display !== 'contents') return false;
+  if (style.position === 'absolute' || style.position === 'fixed' || parseFloat(style.opacity) < 1) return false;
+  // Márgenes o rellenos horizontales crean huecos que un texto de Figma no puede expresar.
+  const gaps = ['margin-left', 'margin-right', 'padding-left', 'padding-right'];
+  if (gaps.some((prop) => Math.abs(parseFloat(style.getPropertyValue(prop)) || 0) >= 0.5)) return false;
+  if ((backgroundPaints(style).length && !clipsToText(style)) || borderOf(style) || shadowsOf(style)) return false;
+  return childNodesOf(el).every(
+    (c) => c.nodeType === Node.TEXT_NODE || c.nodeType === Node.COMMENT_NODE || (c instanceof Element && isPureInline(c)),
+  );
+}
+
+interface InlinePiece {
+  text: Text | null; // null = salto de línea (<br>)
+  style: CSSStyleDeclaration;
+  paint?: TextPaint;
+}
+
+function collectInlinePieces(nodes: Node[], style: CSSStyleDeclaration, paint: TextPaint | undefined, ctx: Ctx, out: InlinePiece[]) {
+  for (const node of nodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out.push({ text: node as Text, style, paint });
+    } else if (node instanceof Element) {
+      if (node.tagName === 'BR') {
+        out.push({ text: null, style, paint });
+        continue;
+      }
+      const childStyle = getComputedStyle(node);
+      if (childStyle.display === 'none' || childStyle.visibility === 'hidden') continue;
+      let childPaint = paint;
+      const bg = backgroundPaints(childStyle);
+      if (clipsToText(childStyle) && bg.length) childPaint = { paints: bg, box: absRect(node.getBoundingClientRect(), ctx) };
+      collectInlinePieces(childNodesOf(node), childStyle, childPaint, ctx, out);
+    }
+  }
+}
+
+function runStyle(style: CSSStyleDeclaration, paint: TextPaint | undefined): Omit<TextRun, 'start' | 'end'> {
+  const { fontFamilies, fontSize, fontWeight, italic, letterSpacing, color, textCase, textDecoration } = textStyle(style);
+  const run: Omit<TextRun, 'start' | 'end'> = { fontFamilies, fontSize, fontWeight, italic, letterSpacing, color, textCase, textDecoration };
+  if (paint) {
+    run.fills = paint.paints;
+    run.fillBox = paint.box;
+  }
+  return run;
+}
+
+function captureInlineGroup(nodes: Node[], block: Element, blockStyle: CSSStyleDeclaration, ctx: Ctx, paint?: TextPaint): TextNode | null {
+  const pieces: InlinePiece[] = [];
+  collectInlinePieces(nodes, blockStyle, paint, ctx, pieces);
+
+  // Concatenar respetando el colapso de espacios de CSS entre fragmentos.
+  let characters = '';
+  const runs: TextRun[] = [];
+  const rects: DOMRect[] = [];
+  for (const piece of pieces) {
+    let text = piece.text ? normalizeWhitespace(piece.text.textContent ?? '', piece.style.whiteSpace) : '\n';
+    if (!piece.style.whiteSpace.startsWith('pre') && text.startsWith(' ') && (characters === '' || /[ \n]$/.test(characters))) {
+      text = text.slice(1);
+    }
+    if (!text) continue;
+    runs.push({ start: characters.length, end: characters.length + text.length, ...runStyle(piece.style, piece.paint) });
+    characters += text;
+    if (piece.text) {
+      const range = document.createRange();
+      range.selectNodeContents(piece.text);
+      for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) rects.push(r);
+    }
+  }
+
+  const lead = characters.length - characters.trimStart().length;
+  characters = characters.trim();
+  if (!characters || rects.length === 0) return null;
+  const trimmedRuns = runs
+    .map((r) => ({ ...r, start: Math.max(0, r.start - lead), end: Math.min(characters.length, r.end - lead) }))
+    .filter((r) => r.end > r.start);
+
+  // Fusionar tramos contiguos con el mismo estilo.
+  const merged: TextRun[] = [];
+  for (const run of trimmedRuns) {
+    const last = merged[merged.length - 1];
+    const same = last && JSON.stringify({ ...last, start: 0, end: 0 }) === JSON.stringify({ ...run, start: 0, end: 0 });
+    if (same && last.end === run.start) last.end = run.end;
+    else merged.push({ ...run });
+  }
+
+  // Caja de todas las líneas.
+  const left = Math.min(...rects.map((r) => r.left));
+  const right = Math.max(...rects.map((r) => r.right));
+  const top = Math.min(...rects.map((r) => r.top));
+  const bottom = Math.max(...rects.map((r) => r.bottom));
+  const tops: number[] = [];
+  for (const r of [...rects].sort((a, b) => a.top - b.top)) {
+    if (!tops.some((t) => Math.abs(t - r.top) < r.height / 2)) tops.push(r.top);
+  }
+  const lineCount = Math.max(tops.length, characters.split('\n').length);
+  const wrap = lineCount > 1;
+
+  // El estilo base es el del primer tramo; el bloque aporta alineación e interlineado.
+  const base = { ...textStyle(blockStyle), ...runStyle(pieces.find((p) => p.text)?.style ?? blockStyle, undefined) };
+
+  let box = { x: left + ctx.scrollX, y: top + ctx.scrollY, width: right - left, height: bottom - top };
+  if (wrap) {
+    // El ancho disponible es la caja de contenido del bloque, no el de la línea más larga.
+    const b = block.getBoundingClientRect();
+    const padLeft = parseFloat(blockStyle.paddingLeft) + parseFloat(blockStyle.borderLeftWidth);
+    const padRight = parseFloat(blockStyle.paddingRight) + parseFloat(blockStyle.borderRightWidth);
+    box = { ...box, x: b.left + padLeft + ctx.scrollX, width: b.width - padLeft - padRight };
+  }
+  const node = makeText(characters, box, lineCount, base, wrap);
+  const styled = merged.length > 1 || merged.some((r) => r.fills);
+  if (styled) node.runs = merged;
+  return node;
+}
+
 // --- SVG en línea ----------------------------------------------------------
 
 const SVG_PAINT_PROPS = ['fill', 'stroke', 'stroke-width', 'fill-opacity', 'stroke-opacity', 'stop-color', 'stop-opacity'];
@@ -347,13 +474,29 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   if (control) frame.children.push(control);
 
   if (!(el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+    // Los nodos de texto y elementos en línea "puros" consecutivos forman un párrafo.
+    let group: Node[] = [];
+    const flush = () => {
+      const meaningful = group.filter((n) => n.nodeType !== Node.COMMENT_NODE);
+      if (meaningful.length === 1 && meaningful[0].nodeType === Node.TEXT_NODE) {
+        frame.children.push(...captureTextNode(meaningful[0] as Text, style, ctx, textPaint));
+      } else if (meaningful.length) {
+        const text = captureInlineGroup(meaningful, el, style, ctx, textPaint);
+        if (text) frame.children.push(text);
+      }
+      group = [];
+    };
     for (const child of childNodesOf(el)) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        frame.children.push(...captureTextNode(child as Text, style, ctx, textPaint));
+      if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.COMMENT_NODE) {
+        group.push(child);
+      } else if (child instanceof Element && isPureInline(child)) {
+        group.push(child);
       } else if (child.nodeType === Node.ELEMENT_NODE) {
+        flush();
         frame.children.push(...walkElement(child as Element, ctx, false, textPaint));
       }
     }
+    flush();
   }
 
   const hasVisual = fills.length > 0 || !!border || !!shadows || clip || opacity < 1 || !!control;
