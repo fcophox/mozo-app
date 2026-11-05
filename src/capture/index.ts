@@ -5,6 +5,7 @@ import { resolveBackgroundBoxes } from './background';
 import { inlineImages } from './images';
 import { materializePseudoElements } from './pseudo';
 import { setRealm, win } from './realm';
+import { finishEntryAnimations, revealPage } from './reveal';
 import { restoreSnapshotState, snapshotPage } from './snapshot';
 import { capturePage } from './walk';
 
@@ -29,18 +30,34 @@ export interface CaptureOptions {
    * pestañas, carruseles…); false la vuelve a cargar desde la URL, con sus scripts.
    */
   preserveState?: boolean;
+  /**
+   * true (por defecto): antes de capturar recorre la página de arriba abajo para que aparezcan
+   * los bloques con animación de entrada y se carguen las imágenes perezosas.
+   */
+  reveal?: boolean;
 }
 
 export async function capture(options: CaptureOptions = {}): Promise<Capture> {
+  const reveal = options.reveal ?? true;
+  const preserveState = options.preserveState ?? true;
+  // La copia del estado no ejecuta scripts: hay que revelar la página real antes de copiarla.
+  if (reveal && (!options.viewport || preserveState)) await revealWithStatus(window);
   if (!options.viewport) return captureWindow(window, options);
   // Con el panel abierto, el iframe se queda en él como vista previa; si no, se quita al terminar.
   const stage = panel?.isConnected ? panel.shadowRoot?.querySelector('.stage') ?? null : null;
-  const frame = await loadFrame(options.viewport, stage, options.preserveState ?? true);
+  const frame = await loadFrame(options.viewport, stage, preserveState);
   try {
+    if (reveal && !preserveState) await revealWithStatus(frame.contentWindow!);
     return await captureWindow(frame.contentWindow as Window & typeof globalThis, options);
   } finally {
     if (!stage) frame.remove();
   }
+}
+
+async function revealWithStatus(target: Window) {
+  const before = statusEl?.textContent ?? '';
+  await revealPage(target, (f) => setStatus(`Recorriendo la página para mostrar todo su contenido… ${Math.round(f * 100)} %`));
+  setStatus(before);
 }
 
 async function captureWindow(target: Window & typeof globalThis, options: CaptureOptions): Promise<Capture> {
@@ -86,7 +103,9 @@ function loadFrame(size: { width: number; height: number }, stage: Element | nul
   frame.width = String(size.width);
   frame.height = String(size.height);
   frame.style.cssText = `width:${size.width}px;height:${size.height}px;border:0;background:#fff;`
-    + (stage ? '' : 'position:fixed;left:-100000px;top:0;visibility:hidden;');
+    // Sin panel, invisible pero dentro de la pantalla: fuera de ella los IntersectionObserver de
+    // la página nunca se disparan y las animaciones de entrada no aparecen.
+    + (stage ? '' : 'position:fixed;left:0;top:0;opacity:0;pointer-events:none;z-index:-2147483647;');
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('La página tardó demasiado en cargar a ese tamaño.')), FRAME_TIMEOUT_MS);
@@ -112,14 +131,7 @@ function loadFrame(size: { width: number; height: number }, stage: Element | nul
       await new Promise((r) => setTimeout(r, 800));
       // Desplazamientos y diálogos de la copia, ya con las imágenes y fuentes en su sitio.
       if (preserveState) restoreSnapshotState(doc);
-      // Las animaciones de entrada (fade/blur-in) se adelantan a su estado final; las infinitas se dejan.
-      for (const animation of doc.getAnimations?.() ?? []) {
-        try {
-          if (animation.effect?.getComputedTiming().endTime !== Infinity) animation.finish();
-        } catch {
-          // animaciones que no se pueden terminar
-        }
-      }
+      finishEntryAnimations(doc);
       resolve(frame);
     }, { once: true });
     if (preserveState) frame.srcdoc = snapshotPage();

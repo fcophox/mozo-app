@@ -387,8 +387,10 @@ function serializeSvg(svg: SVGSVGElement, width: number, height: number): string
   const defs = win.document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   for (const use of Array.from(clone.querySelectorAll('use'))) {
     const href = use.getAttribute('href') ?? use.getAttribute('xlink:href') ?? '';
-    if (!href.startsWith('#') || clone.querySelector(href)) continue;
-    const referenced = win.document.querySelector(href);
+    // Los ids pueden no ser selectores válidos (Framer usa ids numéricos: #1948737764).
+    const id = href.startsWith('#') ? href.slice(1) : '';
+    if (!id || clone.querySelector(`[id="${CSS.escape(id)}"]`)) continue;
+    const referenced = win.document.getElementById(id);
     if (referenced) defs.appendChild(referenced.cloneNode(true));
   }
   if (defs.childNodes.length) clone.insertBefore(defs, clone.firstChild);
@@ -476,8 +478,12 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   const opacity = parseFloat(style.opacity);
   if (opacity === 0) return [];
 
+  // `display: contents` no genera caja (mide 0×0 y su overflow/fondo no pintan): solo
+  // aportan sus hijos. Framer envuelve así cada instancia de componente.
+  const isContents = style.display === 'contents' && !isRoot;
+
   const rect = absRect(el.getBoundingClientRect(), ctx);
-  if (isVisuallyHidden(style, rect)) return [];
+  if (!isContents && isVisuallyHidden(style, rect)) return [];
 
   if (el instanceof win.SVGSVGElement) {
     if (rect.width === 0 || rect.height === 0) return [];
@@ -490,15 +496,15 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   // Con `background-clip: text` el fondo no pinta la caja: se ve solo dentro de las
   // letras (propias y de los descendientes). Lo trasladamos a las capas de texto.
   let textPaint = inheritedTextPaint;
-  let backgrounds = isRoot ? [] : backgroundPaints(style);
+  let backgrounds = isRoot || isContents ? [] : backgroundPaints(style);
   if (!isRoot && clipsToText(style) && backgrounds.length) {
     textPaint = { paints: backgrounds, box: rect };
     backgrounds = [];
   }
-  const fills = isRoot ? [] : [...backgrounds, ...replacedContentPaints(el, style)];
-  const border = borderOf(style);
-  const shadows = shadowsOf(style);
-  const clip = !isRoot && [style.overflowX, style.overflowY].some((o) => o !== 'visible');
+  const fills = isRoot || isContents ? [] : [...backgrounds, ...replacedContentPaints(el, style)];
+  const border = isContents ? null : borderOf(style);
+  const shadows = isContents ? null : shadowsOf(style);
+  const clip = !isRoot && !isContents && [style.overflowX, style.overflowY].some((o) => o !== 'visible');
 
   const frame: FrameNode = {
     type: 'FRAME',
@@ -553,6 +559,7 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
     for (const layer of layers.sort((a, b) => a.level - b.level)) frame.children.push(...layer.nodes);
   }
 
+  if (isContents) return frame.children;
   const hasVisual = fills.length > 0 || !!border || !!shadows || clip || opacity < 1 || !!control;
   if (!isRoot && ctx.options.flatten && !hasVisual) return frame.children;
   if (!hasVisual && frame.children.length === 0) return [];

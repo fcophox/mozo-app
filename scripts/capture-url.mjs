@@ -20,16 +20,7 @@ try {
     console.warn('! La red no quedó inactiva en 60 s; se captura igualmente.');
   });
 
-  // Recorrer la página para disparar imágenes y animaciones que cargan al hacer scroll.
-  await page.evaluate(async () => {
-    for (let y = 0; y < document.documentElement.scrollHeight; y += window.innerHeight / 2) {
-      window.scrollTo(0, y);
-      await new Promise((r) => setTimeout(r, 120));
-    }
-    window.scrollTo(0, 0);
-    await new Promise((r) => setTimeout(r, 500));
-  });
-
+  // capture() recorre la página antes de capturar (animaciones de entrada, imágenes perezosas).
   await page.addScriptTag({ content: code.replace('document.currentScript?.dataset.noAutorun||', 'true||') });
   const capture = await page.evaluate(() => window.__mozo.capture());
   await page.screenshot({ path: out.replace(/\.json$/, '') + '.png', fullPage: true });
