@@ -3,11 +3,13 @@
 
 // Entrada «Blur Text»: recorre los [data-blur] en orden de documento con un reloj común.
 // data-blur="words" anima palabra a palabra (data-step ms entre palabras) y "whole" el
-// elemento entero; data-gap es la pausa antes de empezar ese elemento.
+// elemento entero; data-gap es la pausa antes de empezar ese elemento. SPEED acelera (o frena)
+// todos los retrasos a la vez; la duración de cada palabra está en landing.css (.blur-in).
 (() => {
+  const SPEED = 0.35;
   let delay = 0;
   for (const el of document.querySelectorAll('[data-blur]')) {
-    delay += +(el.dataset.gap || 0);
+    delay += +(el.dataset.gap || 0) * SPEED;
     if (el.dataset.blur === 'whole') {
       el.classList.add('blur-in');
       el.style.setProperty('--delay', `${delay}ms`);
@@ -22,7 +24,7 @@
       span.textContent = word;
       span.style.setProperty('--delay', `${delay}ms`);
       el.append(span, i < parts.length - 1 ? ' ' : '');
-      delay += step;
+      delay += step * SPEED;
     });
   }
 })();

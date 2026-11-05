@@ -7,7 +7,7 @@
 __MOZO_FAVICON__
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sansation:wght@400;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Sansation:wght@400;700&display=swap" />
 <link rel="stylesheet" href="landing.css" />
 </head>
 <body>
@@ -17,7 +17,21 @@ __MOZO_BACKDROP__
   <h1 data-blur="words" data-gap="150">Clona sitios web y llévalos a Figma</h1>
   <p class="lead" data-blur="words" data-step="40">Captura fondos, elementos, logotipos y estructura para seguir trabajando el diseño en Figma.</p>
   <p class="hint" data-blur="whole" data-gap="150">Arrastra este botón a tu barra de marcadores:</p>
-  <a class="bookmarklet" href="__BOOKMARKLET__" data-blur="whole" data-gap="150">__MOZO_MARK__<span class="bookmarklet-label" data-sub="Añádeme a tus marcadores">Mozō</span></a>
+  <div class="bookmarklet-wrap">
+    <a class="bookmarklet" href="__BOOKMARKLET__" data-blur="whole" data-gap="150">__MOZO_MARK__<span class="bookmarklet-label" data-sub="Añádeme a tus marcadores">Mozō</span></a>
+    <div class="sketch-arrow" aria-hidden="true">
+      <span class="sketch-label">¡Arrástrame a tu barra de marcadores!</span>
+      <svg viewBox="0 0 170 210" fill="none">
+        <defs>
+          <filter id="sketchy"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="4" /><feDisplacementMap in="SourceGraphic" scale="3" /></filter>
+        </defs>
+        <g filter="url(#sketchy)">
+          <path class="stroke" pathLength="1" d="M6 186 C 52 196, 112 178, 126 132 C 140 86, 108 70, 118 22" />
+          <path class="stroke head" pathLength="1" d="M100 40 C 108 30, 113 24, 118 16 C 123 26, 128 32, 136 40" />
+        </g>
+      </svg>
+    </div>
+  </div>
   <p class="note" data-blur="whole" data-gap="150">No es una extensión del navegador ni algo intrusivo: es un marcador que tú gestionas. Solo actúa cuando lo pulsas, no pide permisos y lo quitas cuando quieras.</p>
 </header>
 <script src="landing.js"></script>
