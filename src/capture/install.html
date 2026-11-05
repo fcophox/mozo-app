@@ -19,19 +19,46 @@ __MOZO_FAVICON__
     display: inline-flex; align-items: center; gap: 10px; }
   .bookmarklet svg { width: 24px; height: 24px; border-radius: 6px; flex: none; }
   .card { background: var(--card); border-radius: 12px; padding: 4px 20px; margin-top: 24px; }
+  h2 { font-size: 20px; margin: 40px 0 0; }
+  h3 { font-size: 16px; margin: 16px 0 0; }
+  .download { display: inline-block; margin: 16px 0; padding: 12px 20px; border-radius: 10px;
+    border: 2px solid var(--brand); color: var(--fg); font-weight: 600; text-decoration: none; }
+  code { font-size: 14px; }
 </style>
 </head>
 <body>
 <main>
   <h1>__MOZO_LOGO__<span class="sr">Mozō</span></h1>
+  <h2>1. Captura la página</h2>
   <p>Arrastra este botón a tu barra de marcadores:</p>
   <a class="bookmarklet" href="__BOOKMARKLET__">__MOZO_MARK__Mozō</a>
   <div class="card">
     <ol>
       <li>Abre la página que quieras importar y ajusta el ancho de la ventana (será el ancho del frame).</li>
-      <li>Haz clic en el marcador <strong>Mozō</strong>.</li>
-      <li>Pulsa <strong>Copiar JSON</strong> (o <strong>Descargar</strong>).</li>
-      <li>En Figma: Plugins → Development → <strong>Mozō</strong>, pega y pulsa Importar.</li>
+      <li>Haz clic en el marcador <strong>Mozō</strong> y espera a que termine.</li>
+      <li>Pulsa <strong>Copiar JSON</strong> o <strong>Descargar</strong> (guarda un archivo <code>.mozo.json</code>).</li>
+    </ol>
+  </div>
+
+  <h2>2. Instala el plugin de Figma</h2>
+  <p>Descarga el plugin e instálalo una sola vez en Figma Desktop:</p>
+  <a class="download" href="mozo-figma-plugin.zip" download>Descargar plugin para Figma (.zip)</a>
+  <div class="card">
+    <ol>
+      <li>Descomprime el archivo: se crea la carpeta <code>mozo-figma-plugin</code>.</li>
+      <li>Abre <strong>Figma Desktop</strong> (la versión web no permite instalar plugins en desarrollo).</li>
+      <li>Ve a Menú → Plugins → Development → <strong>Import plugin from manifest…</strong></li>
+      <li>Elige el archivo <code>manifest.json</code> de esa carpeta. Mozō aparecerá en Plugins → Development.</li>
+    </ol>
+  </div>
+
+  <h2>3. Sube el JSON a Figma</h2>
+  <div class="card">
+    <ol>
+      <li>Abre el archivo de Figma donde quieras la página.</li>
+      <li>Ve a Plugins → Development → <strong>Mozō</strong>.</li>
+      <li>Pega el JSON copiado en el cuadro de texto, o arrastra ahí el archivo <code>.mozo.json</code> (también puedes pulsar <em>elegir archivo</em>).</li>
+      <li>Pulsa <strong>Importar</strong>: se crea un frame con capas editables del ancho que tenía la ventana.</li>
     </ol>
   </div>
 </main>

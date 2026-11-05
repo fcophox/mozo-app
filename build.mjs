@@ -1,6 +1,7 @@
 // Compila el capturador (bundle IIFE + bookmarklet) y el plugin de Figma de Mozō,
 // inyectando la identidad de marca de brand/.
 import * as esbuild from 'esbuild';
+import { zipSync } from 'fflate';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const watch = process.argv.includes('--watch');
@@ -42,6 +43,15 @@ async function writeBookmarklet() {
   await writeFile('dist/install.html', page);
 }
 
+/** Escribe la UI del plugin y empaqueta el plugin en un .zip descargable desde install.html. */
+async function writePlugin() {
+  await writeFile('plugin/dist/ui.html', applyBrand(await readFile('src/plugin/ui.html', 'utf8')));
+  const files = ['manifest.json', 'dist/code.js', 'dist/ui.html'];
+  const entries = await Promise.all(files.map((f) => readFile(`plugin/${f}`)));
+  const zip = zipSync(Object.fromEntries(files.map((f, i) => [`mozo-figma-plugin/${f}`, entries[i]])));
+  await writeFile('dist/mozo-figma-plugin.zip', zip);
+}
+
 const afterBuild = (name, fn) => ({
   name,
   setup(build) {
@@ -78,7 +88,7 @@ const contexts = await Promise.all([
     bundle: true,
     format: 'iife',
     target: 'es2017',
-    plugins: [afterBuild('plugin', async () => writeFile('plugin/dist/ui.html', applyBrand(await readFile('src/plugin/ui.html', 'utf8'))))],
+    plugins: [afterBuild('plugin', writePlugin)],
   }),
   esbuild.context({
     entryPoints: ['src/plugin/standalone.ts'],
