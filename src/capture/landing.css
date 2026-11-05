@@ -84,7 +84,7 @@ h3 { font-size: 16px; margin: 16px 0 0; }
 .tags li { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--card-border); color: var(--soft); font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .partner { margin-top: 24px; padding: 24px; }
-.creator, .partner, .step { border: none; }
+.creator, .partner { border: none; }
 .partner-logo { display: block; height: 44px; width: auto; margin: 12px 0 8px; }
 .partner p:not(.kicker) { margin: 0 0 16px; }
 .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 32px; }
