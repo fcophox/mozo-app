@@ -3,6 +3,8 @@
 // calculado: el navegador los coloca exactamente donde estaba el pseudo-elemento y el
 // recorrido normal los captura. Al terminar se deshace todo.
 
+import { win } from './realm';
+
 const HIDE_STYLE = '.mozo-hide-before::before{content:none!important}.mozo-hide-after::after{content:none!important}';
 const NO_CHILDREN = new Set(['IMG', 'INPUT', 'TEXTAREA', 'SELECT', 'BR', 'HR', 'IFRAME', 'VIDEO', 'CANVAS', 'OBJECT', 'EMBED']);
 export const PSEUDO_TAG = 'mozo-pseudo';
@@ -24,10 +26,10 @@ interface Job {
 
 export function materializePseudoElements(): () => void {
   const jobs: Job[] = [];
-  for (const el of Array.from(document.body?.querySelectorAll('*') ?? [])) {
-    if (!(el instanceof HTMLElement) || NO_CHILDREN.has(el.tagName)) continue;
+  for (const el of Array.from(win.document.body?.querySelectorAll('*') ?? [])) {
+    if (!(el instanceof win.HTMLElement) || NO_CHILDREN.has(el.tagName)) continue;
     for (const which of ['before', 'after'] as const) {
-      const style = getComputedStyle(el, `::${which}`);
+      const style = win.getComputedStyle(el, `::${which}`);
       const text = contentText(style.content);
       if (text === null || style.display === 'none') continue;
       // Copiamos ya los valores: al ocultar el pseudo-elemento su estilo calculado cambia.
@@ -37,12 +39,12 @@ export function materializePseudoElements(): () => void {
     }
   }
 
-  const sheet = document.createElement('style');
+  const sheet = win.document.createElement('style');
   sheet.textContent = HIDE_STYLE;
-  document.head.appendChild(sheet);
+  win.document.head.appendChild(sheet);
   const created: HTMLElement[] = [];
   for (const { el, which, text, props } of jobs) {
-    const node = document.createElement(PSEUDO_TAG);
+    const node = win.document.createElement(PSEUDO_TAG);
     for (const [prop, value] of props) node.style.setProperty(prop, value);
     node.dataset.pseudo = which;
     node.textContent = text;
@@ -75,7 +77,7 @@ export function isIconText(text: string, style: CSSStyleDeclaration): boolean {
 /** Dibuja el texto con su fuente en un canvas a 2x y devuelve un PNG. */
 export function rasterizeText(text: string, style: CSSStyleDeclaration, width: number, height: number): string | null {
   const scale = 2;
-  const canvas = document.createElement('canvas');
+  const canvas = win.document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(width * scale));
   canvas.height = Math.max(1, Math.ceil(height * scale));
   const ctx = canvas.getContext('2d');

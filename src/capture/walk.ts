@@ -2,6 +2,7 @@
 import type { Box, CapturedNode, FrameNode, Paint, SvgNode, TextNode, TextRun } from '../shared/schema';
 import { backgroundPaints, borderOf, parseColor, radiiOf, shadowsOf, splitTopLevel } from './css';
 import { isIconText, PSEUDO_TAG, rasterizeText } from './pseudo';
+import { win } from './realm';
 
 const SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'META', 'LINK', 'TITLE', 'BASE', 'SOURCE', 'TRACK', 'WBR',
@@ -138,7 +139,7 @@ function contentBox(el: Element, style: CSSStyleDeclaration, ctx: Ctx): Box {
 
 /** Icono de fuente (Font Awesome, fuentes propias...): se convierte en imagen. */
 function captureIconText(textNode: Text, style: CSSStyleDeclaration, ctx: Ctx): FrameNode[] {
-  const range = document.createRange();
+  const range = win.document.createRange();
   range.selectNodeContents(textNode);
   const rect = range.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return [];
@@ -149,7 +150,7 @@ function captureIconText(textNode: Text, style: CSSStyleDeclaration, ctx: Ctx): 
 
 /** Orden de pintado de CSS (simplificado): negativos, flujo normal, posicionados, z-index. */
 function stackLevel(el: Element): number {
-  const style = getComputedStyle(el);
+  const style = win.getComputedStyle(el);
   const z = parseInt(style.zIndex, 10);
   const positioned = style.position !== 'static';
   if (!Number.isNaN(z) && positioned) return z < 0 ? -1 : 1 + z;
@@ -166,7 +167,7 @@ function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx:
   const raw = textNode.textContent ?? '';
   if (!raw.trim()) return [];
 
-  const range = document.createRange();
+  const range = win.document.createRange();
   range.selectNodeContents(textNode);
   const lines = lineRects(range);
   if (lines.length === 0) return [];
@@ -211,7 +212,7 @@ function captureTextLines(textNode: Text, parentStyle: CSSStyleDeclaration, ctx:
   };
   let match: RegExpExecArray | null;
   while ((match = wordRe.exec(raw))) {
-    const wordRange = document.createRange();
+    const wordRange = win.document.createRange();
     wordRange.setStart(textNode, match.index);
     wordRange.setEnd(textNode, match.index + match[0].trimEnd().length);
     const rect = wordRange.getBoundingClientRect();
@@ -245,8 +246,8 @@ const REPLACED_TAGS = new Set(['IMG', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', '
 /** Elemento en línea que solo aporta estilo de texto: sin caja visible ni huecos propios. */
 function isPureInline(el: Element): boolean {
   if (el.tagName === 'BR') return true;
-  if (!(el instanceof HTMLElement) || REPLACED_TAGS.has(el.tagName)) return false;
-  const style = getComputedStyle(el);
+  if (!(el instanceof win.HTMLElement) || REPLACED_TAGS.has(el.tagName)) return false;
+  const style = win.getComputedStyle(el);
   if (style.display === 'none') return true; // se omite al recoger el texto
   if (style.display !== 'inline' && style.display !== 'contents') return false;
   if (isIconText(el.textContent ?? '', style)) return false; // se rasteriza aparte
@@ -256,7 +257,7 @@ function isPureInline(el: Element): boolean {
   if (gaps.some((prop) => Math.abs(parseFloat(style.getPropertyValue(prop)) || 0) >= 0.5)) return false;
   if ((backgroundPaints(style).length && !clipsToText(style)) || borderOf(style) || shadowsOf(style)) return false;
   return childNodesOf(el).every(
-    (c) => c.nodeType === Node.TEXT_NODE || c.nodeType === Node.COMMENT_NODE || (c instanceof Element && isPureInline(c)),
+    (c) => c.nodeType === Node.TEXT_NODE || c.nodeType === Node.COMMENT_NODE || (c instanceof win.Element && isPureInline(c)),
   );
 }
 
@@ -270,12 +271,12 @@ function collectInlinePieces(nodes: Node[], style: CSSStyleDeclaration, paint: T
   for (const node of nodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       out.push({ text: node as Text, style, paint });
-    } else if (node instanceof Element) {
+    } else if (node instanceof win.Element) {
       if (node.tagName === 'BR') {
         out.push({ text: null, style, paint });
         continue;
       }
-      const childStyle = getComputedStyle(node);
+      const childStyle = win.getComputedStyle(node);
       if (childStyle.display === 'none' || childStyle.visibility === 'hidden') continue;
       let childPaint = paint;
       const bg = backgroundPaints(childStyle);
@@ -312,7 +313,7 @@ function captureInlineGroup(nodes: Node[], block: Element, blockStyle: CSSStyleD
     runs.push({ start: characters.length, end: characters.length + text.length, ...runStyle(piece.style, piece.paint) });
     characters += text;
     if (piece.text) {
-      const range = document.createRange();
+      const range = win.document.createRange();
       range.selectNodeContents(piece.text);
       for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) rects.push(r);
     }
@@ -375,7 +376,7 @@ function serializeSvg(svg: SVGSVGElement, width: number, height: number): string
   originals.forEach((orig, i) => {
     const target = clones[i];
     if (!target) return;
-    const style = getComputedStyle(orig);
+    const style = win.getComputedStyle(orig);
     for (const prop of SVG_PAINT_PROPS) {
       const value = style.getPropertyValue(prop);
       if (value && !(prop.startsWith('stop') && orig.tagName !== 'stop')) target.setAttribute(prop, value);
@@ -383,11 +384,11 @@ function serializeSvg(svg: SVGSVGElement, width: number, height: number): string
   });
 
   // <use href="#icono"> que apunta a un sprite externo: copiamos el símbolo.
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const defs = win.document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   for (const use of Array.from(clone.querySelectorAll('use'))) {
     const href = use.getAttribute('href') ?? use.getAttribute('xlink:href') ?? '';
     if (!href.startsWith('#') || clone.querySelector(href)) continue;
-    const referenced = document.querySelector(href);
+    const referenced = win.document.querySelector(href);
     if (referenced) defs.appendChild(referenced.cloneNode(true));
   }
   if (defs.childNodes.length) clone.insertBefore(defs, clone.firstChild);
@@ -402,21 +403,21 @@ function serializeSvg(svg: SVGSVGElement, width: number, height: number): string
 
 function replacedContentPaints(el: Element, style: CSSStyleDeclaration): Paint[] {
   const fit = style.objectFit === 'contain' || style.objectFit === 'scale-down' ? 'FIT' : 'FILL';
-  if (el instanceof HTMLImageElement) {
+  if (el instanceof win.HTMLImageElement) {
     const src = el.currentSrc || el.src;
     return src ? [{ type: 'IMAGE', src, scaleMode: fit }] : [];
   }
-  if (el instanceof HTMLCanvasElement) {
+  if (el instanceof win.HTMLCanvasElement) {
     try {
       return [{ type: 'IMAGE', src: el.toDataURL('image/png'), scaleMode: 'FILL' }];
     } catch {
       return []; // canvas "contaminado" por contenido de otro origen
     }
   }
-  if (el instanceof HTMLVideoElement && el.poster) {
+  if (el instanceof win.HTMLVideoElement && el.poster) {
     return [{ type: 'IMAGE', src: el.poster, scaleMode: fit }];
   }
-  if (el instanceof HTMLIFrameElement || el instanceof HTMLVideoElement) {
+  if (el instanceof win.HTMLIFrameElement || el instanceof win.HTMLVideoElement) {
     return [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85, a: 1 } }];
   }
   return [];
@@ -425,14 +426,14 @@ function replacedContentPaints(el: Element, style: CSSStyleDeclaration): Paint[]
 function formControlText(el: Element, style: CSSStyleDeclaration, frame: FrameNode): TextNode | null {
   let value = '';
   let placeholder = false;
-  if (el instanceof HTMLInputElement) {
+  if (el instanceof win.HTMLInputElement) {
     if (['checkbox', 'radio', 'range', 'color', 'file', 'hidden'].includes(el.type)) return null;
     value = el.type === 'password' ? '•'.repeat(el.value.length) : el.value;
     if (!value && el.placeholder) { value = el.placeholder; placeholder = true; }
-  } else if (el instanceof HTMLTextAreaElement) {
+  } else if (el instanceof win.HTMLTextAreaElement) {
     value = el.value || el.placeholder;
     placeholder = !el.value;
-  } else if (el instanceof HTMLSelectElement) {
+  } else if (el instanceof win.HTMLSelectElement) {
     value = el.selectedOptions[0]?.textContent ?? '';
   }
   if (!value.trim()) return null;
@@ -445,13 +446,13 @@ function formControlText(el: Element, style: CSSStyleDeclaration, frame: FrameNo
     type: 'TEXT',
     name: value.slice(0, 40),
     x: frame.x + padLeft,
-    y: el instanceof HTMLTextAreaElement
+    y: el instanceof win.HTMLTextAreaElement
       ? frame.y + parseFloat(style.paddingTop) + parseFloat(style.borderTopWidth)
       : frame.y + (frame.height - lineBox) / 2,
     width: frame.width - padLeft * 2,
     height: lineBox,
     characters: value,
-    wrap: el instanceof HTMLTextAreaElement,
+    wrap: el instanceof win.HTMLTextAreaElement,
     ...base,
   };
 }
@@ -460,7 +461,7 @@ function childNodesOf(el: Element): Node[] {
   const source: ParentNode = el.shadowRoot ?? el;
   const nodes: Node[] = [];
   for (const child of Array.from(source.childNodes)) {
-    if (child instanceof HTMLSlotElement) nodes.push(...child.assignedNodes({ flatten: true }));
+    if (child instanceof win.HTMLSlotElement) nodes.push(...child.assignedNodes({ flatten: true }));
     else nodes.push(child);
   }
   return nodes;
@@ -470,7 +471,7 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   if (SKIP_TAGS.has(el.tagName) || ctx.options.ignore?.includes(el)) return [];
   if (++ctx.count > MAX_NODES) return [];
 
-  const style = getComputedStyle(el);
+  const style = win.getComputedStyle(el);
   if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return [];
   const opacity = parseFloat(style.opacity);
   if (opacity === 0) return [];
@@ -478,13 +479,13 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   const rect = absRect(el.getBoundingClientRect(), ctx);
   if (isVisuallyHidden(style, rect)) return [];
 
-  if (el instanceof SVGSVGElement) {
+  if (el instanceof win.SVGSVGElement) {
     if (rect.width === 0 || rect.height === 0) return [];
     const node: SvgNode = { type: 'SVG', name: nameFor(el), ...rect, svg: serializeSvg(el, rect.width, rect.height) };
     if (opacity < 1) node.opacity = opacity;
     return [node];
   }
-  if (el instanceof SVGElement) return []; // SVG suelto fuera de <svg>
+  if (el instanceof win.SVGElement) return []; // SVG suelto fuera de <svg>
 
   // Con `background-clip: text` el fondo no pinta la caja: se ve solo dentro de las
   // letras (propias y de los descendientes). Lo trasladamos a las capas de texto.
@@ -518,7 +519,7 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
   const control = formControlText(el, style, frame);
   if (control) frame.children.push(control);
 
-  if (!(el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+  if (!(el instanceof win.HTMLSelectElement || el instanceof win.HTMLTextAreaElement)) {
     // Los nodos de texto y elementos en línea "puros" consecutivos forman un párrafo.
     // Cada hijo lleva su nivel de apilado para reordenarlos como los pinta CSS.
     const layers: { level: number; nodes: CapturedNode[] }[] = [];
@@ -540,9 +541,9 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
     for (const child of childNodesOf(el)) {
       if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.COMMENT_NODE) {
         group.push(child);
-      } else if (child instanceof Element && isPureInline(child)) {
+      } else if (child instanceof win.Element && isPureInline(child)) {
         group.push(child);
-      } else if (child instanceof Element) {
+      } else if (child instanceof win.Element) {
         flush();
         layers.push({ level: stackLevel(child), nodes: walkElement(child, ctx, false, textPaint) });
       }
@@ -559,30 +560,30 @@ function walkElement(el: Element, ctx: Ctx, isRoot = false, inheritedTextPaint?:
 }
 
 export function capturePage(options: WalkOptions): FrameNode {
-  const ctx: Ctx = { options, scrollX: window.scrollX, scrollY: window.scrollY, count: 0 };
-  const doc = document.documentElement;
+  const ctx: Ctx = { options, scrollX: win.scrollX, scrollY: win.scrollY, count: 0 };
+  const doc = win.document.documentElement;
 
   // El fondo de la página se propaga desde <html> o <body> al lienzo.
-  const htmlBg = backgroundPaints(getComputedStyle(doc));
-  const bodyBg = document.body ? backgroundPaints(getComputedStyle(document.body)) : [];
+  const htmlBg = backgroundPaints(win.getComputedStyle(doc));
+  const bodyBg = win.document.body ? backgroundPaints(win.getComputedStyle(win.document.body)) : [];
   const canvasFills = htmlBg.length ? htmlBg : bodyBg.length ? bodyBg : [{ type: 'SOLID' as const, color: { r: 1, g: 1, b: 1, a: 1 } }];
 
   const root: FrameNode = {
     type: 'FRAME',
-    name: document.title || location.hostname,
+    name: win.document.title || win.location.hostname,
     x: 0,
     y: 0,
     width: doc.clientWidth,
-    height: Math.max(doc.scrollHeight, document.body?.scrollHeight ?? 0),
+    height: Math.max(doc.scrollHeight, win.document.body?.scrollHeight ?? 0),
     fills: canvasFills,
     clip: true,
     children: [],
   };
 
   for (const child of childNodesOf(doc)) {
-    if (!(child instanceof Element)) continue;
+    if (!(child instanceof win.Element)) continue;
     // <body> sin su fondo (ya está en el lienzo), pero con sus bordes/sombras.
-    const isBody = child === document.body;
+    const isBody = child === win.document.body;
     for (const node of walkElement(child, ctx, isBody)) {
       if (node.type === 'FRAME' && isBody) root.children.push(...node.children);
       else root.children.push(node);

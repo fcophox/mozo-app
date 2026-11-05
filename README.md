@@ -35,9 +35,12 @@ En Figma Desktop: **Plugins → Development → Import plugin from manifest…**
 
 ## Uso
 
-1. Abre la página y ajusta el ancho de la ventana: será el ancho del frame en Figma.
-2. Pulsa el marcador **Mozō** y espera a que termine (procesa también las imágenes).
-3. **Copiar JSON** o **Descargar**.
+1. Abre la página y pulsa el marcador **Mozō**.
+2. Elige el tamaño del frame: **Actual** (el ancho de la ventana), **Desktop** (1440 × 900),
+   **iPhone 13** (390 × 844) o **iPad Pro 12,9″** (1024 × 1366). Para los tamaños fijos la página se
+   vuelve a cargar en un iframe de ese ancho (se ve como vista previa) y se captura ese render.
+   Espera a que termine (procesa también las imágenes).
+3. **Copiar JSON** o **Descargar**. Puedes elegir otro tamaño y volver a copiar.
 4. En Figma: **Plugins → Development → Mozō**, pega el JSON (o suelta el archivo)
    y pulsa **Importar**.
 
@@ -49,6 +52,7 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 
 - `flatten`: omite los elementos sin estilo visual y sube sus hijos (árbol de capas más limpio).
 - `inlineImages`: incrusta las imágenes como data: URLs en PNG/JPEG/GIF.
+- `viewport`: `{ width, height }` para capturar la página a otro tamaño (en un iframe del mismo origen).
 
 ## Qué soporta
 
@@ -76,6 +80,10 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 
 - **Fuentes:** si la fuente no está instalada en Figma, se sustituye (el plugin te dice cuáles).
   Las genéricas (`sans-serif`, `system-ui`…) se mapean a Inter / SF Pro.
+- **Tamaños fijos (Desktop, iPhone, iPad):** se simula el ancho, no el dispositivo (las webs que
+  cambian según el user-agent o `hover`/`pointer` no lo notan). Las webs que prohíben cargarse en un
+  iframe (`X-Frame-Options: DENY`) solo se pueden capturar con **Actual**: cambia el ancho de la
+  ventana o usa el modo dispositivo de DevTools.
 - **Sin auto-layout:** todo se posiciona en absoluto, tal como se ve en la ventana.
 - Texto solo para lectores de pantalla (`.sr-only`, `.visually-hidden`) se omite.
 - No se capturan `transform` (se usa la caja
