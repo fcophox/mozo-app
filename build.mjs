@@ -6,30 +6,30 @@ import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const watch = process.argv.includes('--watch');
 
-// --- Marca: brand/brand.json + SVG de brand/logo (opcionales) ---------------
-const readOptional = (path) => readFile(path, 'utf8').catch(() => '');
+// --- Marca: brand/brand.json + PNG de brand/logo (opcionales) ---------------
+// Los PNG se generan desde los SVG con scripts/favicons.mjs. Se usan en lugar de los SVG porque
+// estos, exportados de Figma, llevan una imagen grande dentro que haría enorme el bookmarklet.
 const brand = JSON.parse(await readFile('brand/brand.json', 'utf8'));
-const symbolSvg = (await readOptional('brand/logo/mozo-symbol.svg')).replace(/<\?xml[^>]*>\s*/, '').trim();
-const logoSvg = (await readOptional('brand/logo/mozo-logo.svg')).replace(/<\?xml[^>]*>\s*/, '').trim();
-for (const [file, svg] of [['mozo-symbol.svg', symbolSvg], ['mozo-logo.svg', logoSvg]]) {
-  if (!svg) console.warn(`! brand/logo/${file} no existe: se usa el nombre en texto`);
-}
-
-// PNG generados con scripts/favicons.mjs: respaldo para navegadores sin favicon SVG.
-const readPng = (path) => readFile(path).then((b) => `data:image/png;base64,${b.toString('base64')}`).catch(() => '');
+const readPng = (path) => readFile(path).then((b) => `data:image/png;base64,${b.toString('base64')}`).catch(() => {
+  console.warn(`! ${path} no existe (node scripts/favicons.mjs): se usa el nombre en texto`);
+  return '';
+});
 const faviconPng = await readPng('brand/logo/favicon-32.png');
 const touchIconPng = await readPng('brand/logo/apple-touch-icon-180.png');
+const symbolPng = await readPng('brand/logo/mozo-symbol-64.png');
+const logoPng = await readPng('brand/logo/mozo-logo-144.png');
+const symbolImg = symbolPng && `<img class="mozo-mark" src="${symbolPng}" alt="" />`;
 
 /** Sustituye los marcadores __MOZO_*__ de las plantillas HTML. */
 function applyBrand(html) {
   const favicon = [
     faviconPng && `<link rel="icon" type="image/png" sizes="32x32" href="${faviconPng}" />`,
-    symbolSvg && `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(symbolSvg)}" />`,
+    symbolPng && `<link rel="icon" type="image/png" sizes="64x64" href="${symbolPng}" />`,
     touchIconPng && `<link rel="apple-touch-icon" href="${touchIconPng}" />`,
   ].filter(Boolean).join('\n');
   return html
-    .replace('__MOZO_LOGO__<span class="sr">Mozō</span>', logoSvg ? `${logoSvg}<span class="sr">${brand.name}</span>` : brand.name)
-    .replaceAll('__MOZO_MARK__', symbolSvg)
+    .replace('__MOZO_LOGO__<span class="sr">Mozō</span>', logoPng ? `<img src="${logoPng}" alt="${brand.name}" />` : brand.name)
+    .replaceAll('__MOZO_MARK__', symbolImg)
     .replaceAll('__MOZO_FAVICON__', favicon)
     .replaceAll('__MOZO_PRIMARY__', brand.colors.primary)
     .replaceAll('__MOZO_ON_PRIMARY__', brand.colors.onPrimary);
@@ -77,7 +77,7 @@ const contexts = await Promise.all([
     charset: 'ascii', // el bookmarklet no debe llevar caracteres fuera de ASCII
     target: 'chrome100',
     define: {
-      MOZO_MARK: JSON.stringify(symbolSvg),
+      MOZO_MARK: JSON.stringify(symbolImg),
       MOZO_PRIMARY: JSON.stringify(brand.colors.primary),
       MOZO_ON_PRIMARY: JSON.stringify(brand.colors.onPrimary),
     },

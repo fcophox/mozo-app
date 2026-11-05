@@ -69,7 +69,7 @@ function showPanel() {
         font: 13px/1.4 system-ui, -apple-system, sans-serif; color: #1e1e1e; background: #fff;
         border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.24); padding: 14px; }
       h1 { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 0 0 6px; }
-      h1 svg { width: 20px; height: 20px; flex: none; }
+      h1 .mozo-mark { width: 20px; height: 20px; flex: none; border-radius: 5px; }
       p { margin: 0 0 10px; color: #555; }
       .row { display: flex; gap: 8px; }
       button { flex: 1; font: inherit; border: 0; border-radius: 8px; padding: 8px; cursor: pointer;
