@@ -41,11 +41,36 @@ async function writeBookmarklet() {
   await writeFile('dist/bookmarklet.txt', bookmarklet);
   const page = applyBrand(await readFile('src/capture/install.html', 'utf8')).replace('__BOOKMARKLET__', bookmarklet.replace(/"/g, '&quot;'));
   await writeFile('dist/install.html', page);
-  // Capas del fondo con parallax de install.html (01-…, 02-…: de la más lejana a la más cercana),
-  // en WebP generado con scripts/parallax.mjs.
+  await writeLanding();
+}
+
+/** Páginas públicas que comparten landing.css/landing.js y el fondo con parallax. */
+async function writeLanding() {
+  // Capas del parallax (01-…, 02-…: de la más lejana a la más cercana), en WebP generado con
+  // scripts/parallax.mjs.
+  const layers = (await readdir('brand/parallax/web')).filter((f) => /^\d+-.*\.webp$/.test(f)).sort();
+  const depth = (i) => (layers.length - 1 - i) / Math.max(1, layers.length - 1);
+  const backdrop = [
+    '<div class="backdrop" aria-hidden="true">',
+    '  <div class="scene">',
+    ...layers.map((f, i) => `    <img src="parallax/${f}" alt="" data-scroll="${(depth(i) * 0.5).toFixed(2)}" data-move="${Math.round(4 + (1 - depth(i)) * 32)}" />`),
+    '  </div>',
+    '  <canvas class="fireflies"></canvas>',
+    '</div>',
+  ].join('\n');
   await mkdir('dist/parallax', { recursive: true });
-  for (const file of (await readdir('brand/parallax/web')).filter((f) => /^\d+-.*\.webp$/.test(f))) {
-    await copyFile(`brand/parallax/web/${file}`, `dist/parallax/${file}`);
+  for (const file of layers) await copyFile(`brand/parallax/web/${file}`, `dist/parallax/${file}`);
+
+  await writeFile('dist/landing.css', applyBrand(await readFile('src/capture/landing.css', 'utf8')));
+  await copyFile('src/capture/landing.js', 'dist/landing.js');
+  const install = await readFile('dist/install.html', 'utf8');
+  await writeFile('dist/install.html', install.replace('__MOZO_BACKDROP__', backdrop));
+  await writeFile('dist/creador.html', applyBrand(await readFile('src/capture/creador.html', 'utf8')).replace('__MOZO_BACKDROP__', backdrop));
+
+  // Imágenes de El Creador: la foto (WebP de scripts/parallax.mjs) y el logotipo de Rukma.
+  await mkdir('dist/creador', { recursive: true });
+  for (const [from, to] of [['brand/creator/web/foto.webp', 'foto.webp'], ['brand/creator/logotipo-rukma.svg', 'logotipo-rukma.svg']]) {
+    await copyFile(from, `dist/creador/${to}`).catch(() => console.warn(`! ${from} no existe`));
   }
 }
 

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>El Creador · Mozō</title>
+__MOZO_FAVICON__
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sansation:wght@400;700&display=swap" />
+<link rel="stylesheet" href="landing.css" />
+</head>
+<body>
+__MOZO_BACKDROP__
+<nav class="topbar">
+  <a class="back" href="install.html">← Volver a Mozō</a>
+  <a class="nav-link" href="creador.html" aria-current="page">El Creador</a>
+</nav>
+<header class="hero">
+  <p class="eyebrow" data-blur="whole">El Creador</p>
+  <h1 data-blur="words" data-gap="150">Una herramienta para diseñar sin redibujar</h1>
+  <p class="lead" data-blur="words" data-step="40">Mozō nació de una frustración concreta: rehacer en Figma, capa por capa, pantallas que ya existen en el navegador. Aquí se resuelve ese paso, para que el tiempo vaya al diseño y no a la copia.</p>
+</header>
+<script src="landing.js"></script>
+<main class="wide">
+  <section class="card creator">
+    <!-- Si la foto no carga se ven las iniciales. -->
+    <div class="photo"><span aria-hidden="true">FH</span><img src="creador/foto.webp" alt="Francisco Hormazábal" width="640" height="800" onerror="this.remove()" /></div>
+    <div>
+      <p class="kicker">Detrás de Mozō</p>
+      <h2>Francisco Hormazábal</h2>
+      <p class="role">@fcophox • Creador de Mozō · UX Engineer &amp; Product Design Consultant</p>
+      <p>Consultor en investigación, optimización y medición de experiencia para productos digitales, apoyado en datos, diseño e inteligencia artificial.</p>
+      <ul class="tags">
+        <li>Diseño + Desarrollo</li>
+        <li>Artesanía digital</li>
+        <li>Privacidad y control</li>
+      </ul>
+      <div class="actions">
+        <a class="button" href="https://www.fcophox.com/?utm_source=mozo&amp;utm_medium=referral&amp;utm_campaign=el_creador" target="_blank" rel="noopener">Sitio del creador ↗</a>
+        <a class="button" href="https://www.linkedin.com/in/fcophox/?utm_source=mozo&amp;utm_medium=referral&amp;utm_campaign=el_creador" target="_blank" rel="noopener">LinkedIn ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="card partner">
+    <p class="kicker">Partner estratégico</p>
+    <h2><img class="partner-logo" src="creador/logotipo-rukma.svg" alt="Rukma Studio" width="1032" height="270" /></h2>
+    <p>Partner estratégico en la colaboración, el desarrollo y el impulso de Mozō.</p>
+    <a class="button" href="https://rukma.studio/" target="_blank" rel="noopener">rukma.studio ↗</a>
+  </section>
+
+  <div class="section-head">
+    <p class="eyebrow">Los principios</p>
+    <h2>¿Por qué existe Mozō?</h2>
+    <p>Tres criterios que deciden qué se captura, qué se deja fuera y cuándo una importación está bien hecha.</p>
+  </div>
+  <div class="principles">
+    <article class="card principle">
+      <p class="num">01</p>
+      <h3>Nace de una necesidad real</h3>
+      <p>Mozō empezó en un trabajo que ya se estaba haciendo mal: capturas de pantalla pegadas en Figma y horas redibujando cajas, textos y sombras a mano. Cada función entra porque ahorra ese paso de punta a punta, no por sumar opciones.</p>
+    </article>
+    <article class="card principle">
+      <p class="num">02</p>
+      <h3>Fiel a lo que ves, listo para editar</h3>
+      <p>Texto real, fondos, bordes, radios y sombras convertidos en capas de Figma, en su posición exacta. Una imagen plana no sirve para diseñar; una capa editable sí. Y lo que Figma no puede expresar, se avisa en lugar de inventarse.</p>
+    </article>
+    <article class="card principle">
+      <p class="num">03</p>
+      <h3>Tu página no pasa por nadie</h3>
+      <p>La captura ocurre en tu navegador y el JSON va directo a tu archivo de Figma, sin cuentas ni servidores intermedios. Por eso funciona también en páginas privadas, en desarrollo o con la sesión iniciada.</p>
+    </article>
+  </div>
+</main>
+</body>
+</html>
