@@ -43,7 +43,9 @@ En Figma Desktop: **Plugins → Development → Import plugin from manifest…**
    como la dejaste: menús abiertos, pestañas elegidas, carruseles desplazados, formularios rellenos,
    diálogos abiertos, `<canvas>`, estilos de CSS-in-JS y Shadow DOM. La copia no ejecuta scripts; si
    el layout de la web depende de JavaScript, desmárcalo para recargar la página a ese ancho.
-   Espera a que termine (procesa también las imágenes).
+   Antes de capturar, Mozō recorre la página de arriba abajo (y te devuelve a donde estabas) para
+   que aparezcan los bloques con animación de entrada —habituales en Framer y Webflow— y se carguen
+   las imágenes perezosas. Espera a que termine (procesa también las imágenes).
 3. **Copiar JSON** o **Descargar**. Puedes elegir otro tamaño y volver a copiar.
 4. En Figma: **Plugins → Development → Mozō**, pega el JSON (o suelta el archivo)
    y pulsa **Importar**.
@@ -58,6 +60,8 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 - `inlineImages`: incrusta las imágenes como data: URLs en PNG/JPEG/GIF.
 - `viewport`: `{ width, height }` para capturar la página a otro tamaño (en un iframe del mismo origen).
 - `preserveState`: con `viewport`, `true` (por defecto) copia el estado actual de la página; `false` la recarga.
+- `reveal`: `true` (por defecto) recorre la página antes de capturar para mostrar las animaciones de
+  entrada y cargar las imágenes perezosas; `false` captura tal cual está.
 
 ## Qué soporta
 
@@ -79,6 +83,7 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 | `<img>`, `<canvas>`, `poster` de `<video>`, SVG en línea (incluidos `<use>` de sprites) | Relleno de imagen / vector |
 | `<input>`, `<textarea>`, `<select>` | Frame + texto del valor o placeholder |
 | Shadow DOM y `<slot>` | Se recorren como DOM normal |
+| `display: contents` (envoltorios de componentes de Framer) | Transparente: se capturan sus hijos |
 | Cualquier sintaxis de color (`oklch`, `color-mix`…) | El navegador la resuelve a RGBA |
 
 ## Limitaciones conocidas
@@ -128,6 +133,7 @@ src/capture/             capturador (navegador)
   walk.ts                recorrido del DOM, texto, SVG y formularios
   css.ts                 colores, fondos, degradados, bordes, radios y sombras
   images.ts              incrustación de imágenes
+  reveal.ts              recorrido previo (animaciones de entrada, imágenes perezosas)
   index.ts               panel y punto de entrada
 src/plugin/              plugin de Figma
   code.ts                JSON → nodos
