@@ -15,8 +15,28 @@
   .lead { color: inherit; font-weight: 500; }
   p { margin: 0; color: var(--figma-color-text-secondary, #666); }
   .drop {
-    flex: 1; display: flex; flex-direction: column; border: 1px dashed var(--figma-color-border, #ccc);
+    position: relative; flex: 1; display: flex; flex-direction: column; border: 1px dashed var(--figma-color-border, #ccc);
     border-radius: 8px; overflow: hidden;
+  }
+  /* Confirmación tras importar: un check que se dibuja, ~1 s, y la UI vuelve a quedar limpia. */
+  .success {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: var(--figma-color-bg, #fff); text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .success.show { opacity: 1; pointer-events: auto; }
+  .success svg { width: 56px; height: 56px; }
+  .success circle { fill: var(--figma-color-bg-success, #14ae5c); transform-origin: center; }
+  .success path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 24; stroke-dashoffset: 24; }
+  .success.show circle { animation: pop .3s cubic-bezier(.3, 1.5, .6, 1); }
+  .success.show path { animation: draw .3s .15s ease-out forwards; }
+  .success strong { font-size: 13px; }
+  .success span { color: var(--figma-color-text-secondary, #666); }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .success.show circle { animation: none; }
+    .success.show path { animation: none; stroke-dashoffset: 0; }
   }
   .drop.over { border-color: var(--mozo-primary); background: var(--figma-color-bg-brand-tertiary, #e5f4ff); }
   textarea {
@@ -41,6 +61,11 @@
   <p>Ejecuta el capturador en la página, copia el JSON y pégalo aquí, o suelta el archivo <code>.mozo.json</code>.</p>
   <div class="drop" id="drop">
     <textarea id="json" placeholder="Pega aquí el JSON de la captura…" spellcheck="false"></textarea>
+    <div class="success" id="success" aria-hidden="true">
+      <svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="28" /><path d="M17 29l7 7 15-16" /></svg>
+      <strong>Importado correctamente</strong>
+      <span id="success-detail"></span>
+    </div>
   </div>
   <div class="row">
     <button id="import">Importar</button>
@@ -51,7 +76,8 @@
 
 <script>
   const $ = (id) => document.getElementById(id);
-  const textarea = $('json'), importBtn = $('import'), cancelBtn = $('cancel'), status = $('status');
+  const textarea = $('json'), importBtn = $('import'), cancelBtn = $('cancel'), status = $('status'), success = $('success');
+  const SUCCESS_MS = 1000;
 
   function setStatus(text, isError = false) {
     status.textContent = text;
@@ -101,11 +127,28 @@
     const msg = event.data.pluginMessage;
     if (!msg) return;
     if (msg.type === 'progress') setStatus(msg.text);
-    if (msg.type === 'done' || msg.type === 'error') {
+    if (msg.type === 'error') {
       setBusy(false);
-      setStatus(msg.text, msg.type === 'error');
+      setStatus(msg.text, true);
     }
+    if (msg.type === 'done') showSuccess(msg.text, msg.warnings || []);
   };
+
+  /** Muestra el check un segundo y deja la UI lista para pegar otro JSON. */
+  function showSuccess(detail, warnings) {
+    setStatus('');
+    $('success-detail').textContent = detail;
+    success.classList.add('show');
+    setTimeout(() => {
+      success.classList.remove('show');
+      textarea.value = '';
+      $('file').value = '';
+      setBusy(false);
+      // Los avisos (fuentes sustituidas, imágenes que fallaron) se quedan a la vista.
+      setStatus(warnings.join(' '));
+      textarea.focus();
+    }, SUCCESS_MS);
+  }
 </script>
 </body>
 </html>
