@@ -2,7 +2,7 @@
 // inyectando la identidad de marca de brand/.
 import * as esbuild from 'esbuild';
 import { zipSync } from 'fflate';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const watch = process.argv.includes('--watch');
 
@@ -41,6 +41,7 @@ async function writeBookmarklet() {
   await writeFile('dist/bookmarklet.txt', bookmarklet);
   const page = applyBrand(await readFile('src/capture/install.html', 'utf8')).replace('__BOOKMARKLET__', bookmarklet.replace(/"/g, '&quot;'));
   await writeFile('dist/install.html', page);
+  await copyFile('brand/ld/bg.jpg', 'dist/bg.jpg'); // fondo de install.html
 }
 
 /** Escribe la UI del plugin y empaqueta el plugin en un .zip descargable desde install.html. */
