@@ -4,3 +4,4 @@ plugin/dist/
 *.json.capture
 .claude/
 captures/
+.DS_Store
