@@ -38,7 +38,11 @@ En Figma Desktop: **Plugins → Development → Import plugin from manifest…**
 1. Abre la página y pulsa el marcador **Mozō**.
 2. Elige el tamaño del frame: **Actual** (el ancho de la ventana), **Desktop** (1440 × 900),
    **iPhone 13** (390 × 844) o **iPad Pro 12,9″** (1024 × 1366). Para los tamaños fijos la página se
-   vuelve a cargar en un iframe de ese ancho (se ve como vista previa) y se captura ese render.
+   pinta en un iframe de ese ancho (se ve como vista previa) y se captura ese render. Con
+   **Conservar el estado actual** (marcado por defecto) el iframe recibe una copia de la página tal
+   como la dejaste: menús abiertos, pestañas elegidas, carruseles desplazados, formularios rellenos,
+   diálogos abiertos, `<canvas>`, estilos de CSS-in-JS y Shadow DOM. La copia no ejecuta scripts; si
+   el layout de la web depende de JavaScript, desmárcalo para recargar la página a ese ancho.
    Espera a que termine (procesa también las imágenes).
 3. **Copiar JSON** o **Descargar**. Puedes elegir otro tamaño y volver a copiar.
 4. En Figma: **Plugins → Development → Mozō**, pega el JSON (o suelta el archivo)
@@ -53,6 +57,7 @@ const capture = await window.__mozo.capture({ flatten: true, inlineImages: true 
 - `flatten`: omite los elementos sin estilo visual y sube sus hijos (árbol de capas más limpio).
 - `inlineImages`: incrusta las imágenes como data: URLs en PNG/JPEG/GIF.
 - `viewport`: `{ width, height }` para capturar la página a otro tamaño (en un iframe del mismo origen).
+- `preserveState`: con `viewport`, `true` (por defecto) copia el estado actual de la página; `false` la recarga.
 
 ## Qué soporta
 

@@ -5,6 +5,7 @@ import { resolveBackgroundBoxes } from './background';
 import { inlineImages } from './images';
 import { materializePseudoElements } from './pseudo';
 import { setRealm, win } from './realm';
+import { restoreSnapshotState, snapshotPage } from './snapshot';
 import { capturePage } from './walk';
 
 // Identidad de marca, inyectada por build.mjs desde brand/.
@@ -21,15 +22,20 @@ declare global {
 export interface CaptureOptions {
   flatten?: boolean;
   inlineImages?: boolean;
-  /** Vuelve a cargar la página en un iframe de este tamaño y captura ese render. */
+  /** Pinta la página en un iframe de este tamaño y captura ese render. */
   viewport?: { width: number; height: number };
+  /**
+   * Con viewport: true (por defecto) copia la página tal como está ahora (menús abiertos,
+   * pestañas, carruseles…); false la vuelve a cargar desde la URL, con sus scripts.
+   */
+  preserveState?: boolean;
 }
 
 export async function capture(options: CaptureOptions = {}): Promise<Capture> {
   if (!options.viewport) return captureWindow(window, options);
   // Con el panel abierto, el iframe se queda en él como vista previa; si no, se quita al terminar.
   const stage = panel?.isConnected ? panel.shadowRoot?.querySelector('.stage') ?? null : null;
-  const frame = await loadFrame(options.viewport, stage);
+  const frame = await loadFrame(options.viewport, stage, options.preserveState ?? true);
   try {
     return await captureWindow(frame.contentWindow as Window & typeof globalThis, options);
   } finally {
@@ -64,23 +70,23 @@ async function captureWindow(target: Window & typeof globalThis, options: Captur
 }
 
 // --- Captura a otro tamaño ----------------------------------------------------
-// Un bookmarklet no puede cambiar el tamaño de la ventana, así que la página se carga de nuevo
-// en un iframe del mismo origen con el ancho elegido: las media queries, los vw/vh y el layout
-// responden a ese ancho. sandbox sin allow-top-navigation impide que un script "anti-iframe"
-// saque al usuario de la página.
+// Un bookmarklet no puede cambiar el tamaño de la ventana, así que la página se pinta en un
+// iframe del mismo origen con el ancho elegido: las media queries, los vw/vh y el layout
+// responden a ese ancho. Por defecto el iframe recibe una copia del estado actual (snapshot.ts),
+// sin scripts; si no, se recarga la URL. sandbox sin allow-top-navigation impide que un script
+// "anti-iframe" saque al usuario de la página.
 
 const FRAME_TIMEOUT_MS = 30000;
 
-function loadFrame(size: { width: number; height: number }, stage: Element | null): Promise<HTMLIFrameElement> {
+function loadFrame(size: { width: number; height: number }, stage: Element | null, preserveState: boolean): Promise<HTMLIFrameElement> {
   stage?.querySelector('iframe')?.remove();
   const frame = document.createElement('iframe');
-  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+  // La copia no lleva scripts: sin allow-scripts tampoco se ejecutan los atributos on*.
+  frame.setAttribute('sandbox', preserveState ? 'allow-same-origin' : 'allow-scripts allow-same-origin allow-forms');
   frame.width = String(size.width);
   frame.height = String(size.height);
   frame.style.cssText = `width:${size.width}px;height:${size.height}px;border:0;background:#fff;`
     + (stage ? '' : 'position:fixed;left:-100000px;top:0;visibility:hidden;');
-  (stage ?? document.documentElement).appendChild(frame);
-  if (stage) fitStage(stage as HTMLElement, size);
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('La página tardó demasiado en cargar a ese tamaño.')), FRAME_TIMEOUT_MS);
@@ -93,6 +99,7 @@ function loadFrame(size: { width: number; height: number }, stage: Element | nul
         // acceso bloqueado
       }
       if (!doc || doc.URL === 'about:blank') {
+        frame.remove();
         reject(new Error('Esta web no permite cargarse en un iframe. Cambia el ancho de la ventana (o usa el modo dispositivo de DevTools) y elige «Actual».'));
         return;
       }
@@ -103,6 +110,8 @@ function loadFrame(size: { width: number; height: number }, stage: Element | nul
       await doc.fonts?.ready.catch(() => undefined);
       // Margen para animaciones de entrada e imágenes que se cargan al aparecer.
       await new Promise((r) => setTimeout(r, 800));
+      // Desplazamientos y diálogos de la copia, ya con las imágenes y fuentes en su sitio.
+      if (preserveState) restoreSnapshotState(doc);
       // Las animaciones de entrada (fade/blur-in) se adelantan a su estado final; las infinitas se dejan.
       for (const animation of doc.getAnimations?.() ?? []) {
         try {
@@ -113,7 +122,10 @@ function loadFrame(size: { width: number; height: number }, stage: Element | nul
       }
       resolve(frame);
     }, { once: true });
-    frame.src = location.href;
+    if (preserveState) frame.srcdoc = snapshotPage();
+    else frame.src = location.href;
+    (stage ?? document.documentElement).appendChild(frame);
+    if (stage) fitStage(stage as HTMLElement, size);
   });
 }
 
@@ -174,6 +186,8 @@ function showPanel() {
         background: #f2f2f2; color: #1e1e1e; box-shadow: inset 0 0 0 1px transparent; }
       .sizes button small { font-size: 11px; color: #777; }
       .sizes button[aria-pressed="true"] { background: #fff; box-shadow: inset 0 0 0 2px ${MOZO_PRIMARY}; }
+      .keep { display: flex; align-items: flex-start; gap: 6px; margin: -4px 0 12px; font-size: 12px; color: #555; cursor: pointer; }
+      .keep input { margin: 2px 0 0; accent-color: ${MOZO_PRIMARY}; }
       .row { display: flex; gap: 8px; }
       button { flex: 1; font: inherit; border: 0; border-radius: 8px; padding: 8px; cursor: pointer;
         background: ${MOZO_PRIMARY}; color: ${MOZO_ON_PRIMARY}; }
@@ -193,6 +207,8 @@ function showPanel() {
           s.viewport ? s.detail : `${window.innerWidth} × ${window.innerHeight}`
         }</small></button>`).join('')}
       </div>
+      <label class="keep"><input type="checkbox" class="preserve" checked />
+        <span>Conservar el estado actual (menús, pestañas, carruseles…)</span></label>
       <p class="status">Elige un tamaño para capturar la página.</p>
       <div class="row">
         <button class="copy" disabled>Copiar JSON</button>
@@ -212,6 +228,7 @@ function run() {
   const downloadBtn = shadow.querySelector<HTMLButtonElement>('.download')!;
   const sizeBtns = Array.from(shadow.querySelectorAll<HTMLButtonElement>('[data-size]'));
   const stage = shadow.querySelector<HTMLElement>('.stage')!;
+  const preserve = shadow.querySelector<HTMLInputElement>('.preserve')!;
   let json = '';
   let busy = false;
 
@@ -247,11 +264,11 @@ function run() {
         stage.hidden = true;
         stage.replaceChildren();
       }
-      setStatus(size.viewport ? `Cargando la página a ${size.viewport.width} px…` : 'Capturando…');
+      setStatus(size.viewport ? `Pintando la página a ${size.viewport.width} px…` : 'Capturando…');
       // Esperar un frame para que el panel se pinte antes del recorrido (que bloquea).
       await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
       try {
-        const result = await capture({ viewport: size.viewport ?? undefined });
+        const result = await capture({ viewport: size.viewport ?? undefined, preserveState: preserve.checked });
         json = JSON.stringify(result);
         const sizeMb = (json.length / 1024 / 1024).toFixed(1);
         setStatus(`${result.root.width} px · ${countNodes(result)} capas · ${sizeMb} MB. Pégalo en el plugin de Figma.`);

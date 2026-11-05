@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Fixture de estado (Mozō)</title>
+<!-- Página con estado creado por JS, para probar que la captura a otro ancho lo conserva. -->
+<style>
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; background: #f5f3ef; color: #222; }
+  .wrap { padding: 24px; }
+  .tabs button { padding: 8px 14px; border: 0; background: #ddd; }
+  .tabs button.active { background: #7a2cf0; color: #fff; }
+  .panel { display: none; padding: 16px; background: #fff; }
+  .panel.active { display: block; }
+  .menu { display: none; background: #222; color: #fff; padding: 12px; }
+  .menu.open { display: block; }
+  .carousel { display: flex; overflow-x: auto; width: 100%; gap: 8px; }
+  .carousel div { flex: 0 0 300px; height: 80px; background: #0d99ff; color: #fff; display: grid; place-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <button id="toggle">Menú</button>
+  <nav class="menu">Menú abierto por JS</nav>
+  <div class="tabs"><button data-tab="a" class="active">A</button><button data-tab="b">B</button></div>
+  <div class="panel active" id="a">Panel A (inicial)</div>
+  <div class="panel" id="b">Panel B (elegido por el usuario)</div>
+  <input id="name" placeholder="Nombre" />
+  <label><input type="checkbox" id="check" /> Acepto</label>
+  <select id="sel"><option>Uno</option><option>Dos</option></select>
+  <div class="carousel" id="car"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div></div>
+  <canvas id="cv" width="120" height="40"></canvas>
+  <p class="css-in-js">Texto con estilo insertado por CSSOM</p>
+  <x-card></x-card>
+  <div class="grid"><div>1</div><div>2</div><div>3</div></div>
+  <dialog id="dlg"><p>Diálogo modal abierto</p></dialog>
+</div>
+<script>
+  document.getElementById('toggle').onclick = () => document.querySelector('.menu').classList.toggle('open');
+  document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('.tabs button, .panel').forEach((el) => el.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.tab).classList.add('active');
+  });
+  const style = document.createElement('style');
+  document.head.append(style);
+  style.sheet.insertRule('.css-in-js { color: rgb(200, 0, 0); font-weight: 700; }');
+  const ctx = document.getElementById('cv').getContext('2d');
+  ctx.fillStyle = '#ff5f6d'; ctx.fillRect(0, 0, 120, 40);
+  customElements.define('x-card', class extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: 'open' });
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync('p { color: rgb(0, 128, 0); }');
+      root.adoptedStyleSheets = [sheet];
+      root.innerHTML = '<p>Shadow DOM con hoja adoptada</p>';
+    }
+  });
+</script>
+</body>
+</html>
